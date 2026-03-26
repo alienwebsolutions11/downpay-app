@@ -1,17 +1,12 @@
-// app/routes/hello.tsx
-import { json } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+// app/routes/app._index.jsx
+import { Link } from "@remix-run/react";
 
-export const loader = async () => {
-  // No database call here
-  return json({ message: "Hello world! ✅" });
-};
-
-export default function Hello() {
-  const data = useLoaderData<typeof loader>();
+export default function AppIndex() {
   return (
-    <div style={{ textAlign: "center", marginTop: "50px" }}>
-      <h1>{data.message}</h1>
+    <div>
+      <h1>Hello, this is a test page!</h1>
+      <p>No database needed.</p>
+      <Link to="/">Go home</Link>
     </div>
   );
 }
