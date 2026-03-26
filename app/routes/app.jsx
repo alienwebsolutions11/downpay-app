@@ -26,7 +26,7 @@ export default function App() {
         <Link to="/app/analytics">Analytics</Link>
           <Link to="/app/settings">Settings</Link>
             <Link to="/app/integrations">Integrations</Link>
-                <Link to="/app/health">ons</Link>
+                {/* <Link to="/app/health">ons</Link> */}
         {/* <Link to="/app/purchase">purchase</Link> */}
       </NavMenu>
       <Outlet />
