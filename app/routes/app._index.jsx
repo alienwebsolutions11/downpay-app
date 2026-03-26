@@ -30,8 +30,8 @@ import { redirect, json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import { useState } from "react";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
-import { deleteSellingPlanGroup,isThemeBlockActive } from "./api.deleteplan";
-import { getTotalProductCount } from "./api.productbytag"
+import { deleteSellingPlanGroup,isThemeBlockActive } from "../Utils/shopifyHelpers.server";
+import { getTotalProductCount } from "../Utils/shopifyHelpers.server"
 import logo from '../routes/Photos/down.jpg'
 import alien from '../routes/Photos/alien.jpg'
 import {

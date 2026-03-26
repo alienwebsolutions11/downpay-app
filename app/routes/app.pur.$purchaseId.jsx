@@ -11,8 +11,8 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import { useFetcher, useLoaderData, Outlet } from "@remix-run/react";
 import { redirect } from "@remix-run/node";
 import { useState, useCallback, useMemo, useEffect } from "react";
-import { getAllProductIds,  getAllExistingPlanProducts} from "./api.productbytag";
-import {deleteSellingPlanGroup} from "./api.deleteplan"
+import { getAllProductIds,  getAllExistingPlanProducts} from "../Utils/shopifyHelpers.server";
+import {deleteSellingPlanGroup} from "../Utils/shopifyHelpers.server"
 import { useNavigation } from "@remix-run/react";
 
 
