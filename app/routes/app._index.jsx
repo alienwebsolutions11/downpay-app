@@ -784,7 +784,7 @@ console.log("themeExtensionActive:", themeExtensionActive);
                                         {
                                           content: "Manage payments",
                                           onAction: () => {
-                                            navigate(`/app/payments/${purchase_id}`);
+                                            navigate(`/app/payments/${id}`);
                                             setActivePopoverId(null);
                                           },
                                         },
@@ -793,7 +793,7 @@ console.log("themeExtensionActive:", themeExtensionActive);
                                           destructive: true,
 
                                           onAction: () => {
-                                            setDeleteId(purchase_id);
+                                            setDeleteId(id);
                                             if (isDeleting) return;
                                             setDeleteOpen(true);
                                           }
@@ -807,7 +807,7 @@ console.log("themeExtensionActive:", themeExtensionActive);
                                     variant="primary"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      navigate(`/app/pur/${purchase_id}`);
+                                      navigate(`/app/pur/${id}`);
                                     }}
                                   >
                                     Customize
