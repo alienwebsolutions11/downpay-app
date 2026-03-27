@@ -74,13 +74,7 @@ query getProductTags($cursor: String) {
 }
 `;
 
-// export const loader = async ({ request }) => {
-//   const { session } = await authenticate.admin(request);
 
-//   return json({
-//     shop: session.shop,
-//   });
-// };
 
 export const loader = async ({ request }) => {
     const { session, admin } = await authenticate.admin(request);
@@ -356,64 +350,35 @@ export const action = async ({ request }) => {
 
     console.timeEnd("ACTION_TOTAL");
 
-    try {
-        await new Promise((resolve, reject) => {
-            db.query(
-                `INSERT INTO purchase_table (
-                shop,
-          purchase_option_name,
-          line_item_text,
-          selection_type,
-          products,
-          variants,
-          tags,
-          whole,
-          deposit_options_display,
-          payment_collection_type,
-          deposit_type,
-          deposit_amount,
-          payin_full,
-          deferred_due,
-          app_id,
-          remaining_balance_days,
-          remaining_balance_date,
+ try {
+    // ✅ INSERT (PostgreSQL style)
+    const insertResult = await db.query(
+        `INSERT INTO purchase_table (
+            shop,
+            purchase_option_name,
+            line_item_text,
+            selection_type,
+            products,
+            variants,
+            tags,
+            whole,
+            deposit_options_display,
+            payment_collection_type,
+            deposit_type,
+            deposit_amount,
+            payin_full,
+            deferred_due,
+            app_id,
+            remaining_balance_days,
+            remaining_balance_date,
             selling_plan_group_id,
-        selling_plan_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [
-                    session.shop,
-                    purchaseName,
-                    lineItemText,
-                    selectiontype,
-                    products,
-                    variants,
-                    tags,
-                    whole,
-                    depositDisplay,
-                    paymentCollection,
-                    depositType,
-                    depositAmount,
-                    payfull ? 1 : 0,
-                    deferredDue,
-                    "newappid",
-                    remainingDueday,
-                    remainingDuedate,
-                    sellingPlanGroupId,
-                    sellingPlanId,
-                ],
-
-
-                (err, result) => {
-                    if (err) return reject(err);
-
-                    // ✅ ADD THIS
-                    console.log("INSERT RESULT:", result);
-
-                    resolve(result);
-                }
-
-            );
-        }); console.log({
+            selling_plan_id
+        ) VALUES (
+            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
+            $11,$12,$13,$14,$15,$16,$17,$18,$19
+        ) RETURNING *`,
+        [
+            session.shop,
             purchaseName,
             lineItemText,
             selectiontype,
@@ -421,28 +386,48 @@ export const action = async ({ request }) => {
             variants,
             tags,
             whole,
-        });
-        await new Promise((resolve, reject) => {
-            db.query(
-                `UPDATE purchase_table
-     SET app_id = ?
-     WHERE app_id IS NULL OR app_id = ''`,
-                ["newappid"],
-                (err, result) => {
-                    if (err) return reject(err);
-                    console.log("Updated old records with new appId:", result.affectedRows);
-                    resolve(result);
-                }
-            );
-        });
+            depositDisplay,
+            paymentCollection,
+            depositType,
+            depositAmount,
+            payfull ? true : false, // ✅ boolean fix
+            deferredDue,
+            "newappid",
+            remainingDueday,
+            remainingDuedate,
+            sellingPlanGroupId,
+            sellingPlanId,
+        ]
+    );
 
-        console.log("Data inserted successfully!");
-        return redirect("/app?toast=data-saved");
-    } catch (error) {
-        console.error("DB insert error:", error);
-        return json({ success: false, error: error.message });
+    console.log("INSERT RESULT:", insertResult.rows);
 
-    }
+    // ✅ UPDATE (PostgreSQL style)
+    const updateResult = await db.query(
+        `UPDATE purchase_table
+         SET app_id = $1
+         WHERE app_id IS NULL OR app_id = ''`,
+        ["newappid"]
+    );
+
+    console.log("Updated rows:", updateResult.rowCount);
+
+    console.log({
+        purchaseName,
+        lineItemText,
+        selectiontype,
+        products,
+        variants,
+        tags,
+        whole,
+    });
+
+    return redirect("/app?toast=data-saved");
+
+} catch (error) {
+    console.error("DB insert error:", error);
+    return json({ success: false, error: error.message });
+}
 };
 
 
@@ -697,41 +682,7 @@ export default function NewPage() {
             )
         }
 
-        // if (selectedType === "Products")
-        //     return (
-        //         <>
-        //             <Text>Select products to enable this purchase option for them</Text>
-
-        //             <Box marginTop="400">
-        //                 {selectedProducts.map((product) => (
-        //                     <Box
-        //                         key={product.id}
-        //                         padding="300"
-        //                         borderBlockEndWidth="025"
-        //                         borderColor="border"
-        //                     >
-        //                         <InlineStack align="space-between">
-        //                             <InlineStack gap="300">
-        //                                 <Thumbnail
-        //                                     source={product.images?.[0]?.originalSrc}
-        //                                     alt={product.title}
-        //                                 />
-        //                                 <InlineStack gap="200">
-        //                                     <Text>{product.title}</Text>
-        //                                     <Badge tone="success">Active</Badge>
-        //                                 </InlineStack>
-        //                             </InlineStack>
-
-        //                             <Button variant="plain" onClick={() => handleViewProduct(product.id)}>View</Button>
-        //                         </InlineStack>
-        //                     </Box>
-        //                 ))}
-        //             </Box>
-        //             <Box style={{ marginTop: "var(--p-space-400)" }}>
-        //                 <Button onClick={handleOpenPicker}>Select products</Button>
-        //             </Box>
-        //         </>
-        //     );
+  
 
         if (selectedType === "Products")
             return (
