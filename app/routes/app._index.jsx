@@ -670,7 +670,7 @@ console.log("themeExtensionActive:", themeExtensionActive);
 
                         renderItem={(item) => {
                           const {
-                           id,
+                            purchase_id,
                             purchase_option_name,
                             selection_type,
                             products,
