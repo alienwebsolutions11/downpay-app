@@ -167,18 +167,18 @@ export async function loader({ params, request }) {
     const allTags = await fetchAllShopTags(admin);
   const purchase = await new Promise((resolve, reject) => {
     db.query(
-      "SELECT * FROM purchase_table WHERE purchase_id = ?",
-      [params.purchaseId],
-      (err, res) => (err ? reject(err) : resolve(res[0]))
+      "SELECT * FROM purchase_table WHERE id = $1",
+      [params.id],
+      (err, res) => (err ? reject(err) : resolve(res.rows[0]))
     );
   });
 
 
-  if (!purchase?.selling_plan_group_id) {
-    throw new Error("Selling plan group ID missing");
-  }
   if (!purchase) {
     throw new Response("Not Found", { status: 404 });
+  }
+  if (!purchase?.selling_plan_group_id) {
+    throw new Error("Selling plan group ID missing");
   }
 
   const productIds =
@@ -297,9 +297,9 @@ export async function action({ request, params }) {
       db.query(
         `SELECT selling_plan_group_id
          FROM purchase_table
-         WHERE purchase_id = ?`,
-        [params.purchaseId],
-        (err, res) => (err ? reject(err) : resolve(res[0]))
+         WHERE id = $1`,
+        [params.id],
+        (err, res) => (err ? reject(err) : resolve(res.rows[0]))
       );
     });
 
@@ -319,8 +319,8 @@ export async function action({ request, params }) {
  
     await new Promise((resolve, reject) => {
       db.query(
-        "DELETE FROM purchase_table WHERE purchase_id = ?",
-        [params.purchaseId],
+        "DELETE FROM purchase_table WHERE id = $1",
+        [params.id],
         (err) => (err ? reject(err) : resolve())
       );
     });
@@ -331,22 +331,22 @@ export async function action({ request, params }) {
   await new Promise((resolve, reject) => {
     db.query(
       `UPDATE purchase_table SET
-        purchase_option_name=?,
-        line_item_text=?,
-        selection_type=?,
-        products=?,
-        variants=?,
-        tags=?,
-        whole=?,
-        deposit_options_display=?,
-        payment_collection_type=?,
-        deposit_type=?,
-        deposit_amount=?,
-        payin_full=?,
-        deferred_due=?,
-        remaining_balance_days=?,
-        remaining_balance_date=?
-       WHERE purchase_id=?`,
+        purchase_option_name=$1,
+        line_item_text=$2,
+        selection_type=$3,
+        products=$4,
+        variants=$5,
+        tags=$6,
+        whole=$7,
+        deposit_options_display=$8,
+        payment_collection_type=$9,
+        deposit_type=$10,
+        deposit_amount=$11,
+        payin_full=$12,
+        deferred_due=$13,
+        remaining_balance_days=$14,
+        remaining_balance_date=$15
+       WHERE id=$16`,
       [
         formData.get("purchaseName"),
         formData.get("lineItemText"),
@@ -363,7 +363,7 @@ export async function action({ request, params }) {
         formData.get("deferredDue"),
         formData.get("remainingDueday") || null,
         formData.get("remainingDuedate") || null,
-        params.purchaseId,
+        params.id,
       ],
       (err) => (err ? reject(err) : resolve())
     );
@@ -375,12 +375,12 @@ console.timeEnd("DB_UPDATE");
     db.query(
       `SELECT selling_plan_group_id, selling_plan_id
        FROM purchase_table
-       WHERE purchase_id = ?`,
-      [params.purchaseId],
-      (err, res) => (err ? reject(err) : resolve(res[0]))
+       WHERE id = $1`,
+      [params.id],
+      (err, res) => (err ? reject(err) : resolve(res.rows[0]))
     );
   });
-
+console.log("PARAM ID:", params.id);
   if (!planRow?.selling_plan_group_id) throw new Error("Missing selling plan group id");
 
 
