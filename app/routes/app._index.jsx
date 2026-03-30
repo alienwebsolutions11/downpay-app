@@ -45,8 +45,13 @@ import db from "../Utils/db.createserver"
 
 
 export const loader = async ({ request }) => {
+  console.log("👉 LOADER START");
   const { session } = await authenticate.admin(request);
-
+  if (!session?.shop) {
+    console.error("❌ Missing shop in session");
+    throw new Response("Unauthorized", { status: 401 });
+  }
+  console.log("✅ SESSION OK:", session.shop);
   // const purchases = await new Promise((resolve, reject) => {
   //   db.query(
   //     `SELECT *
@@ -87,23 +92,24 @@ const purchases = await new Promise((resolve, reject) => {
     accessToken: session.accessToken,
   });
 const safePurchases = Array.isArray(purchases) ? purchases : [];
-  const purchasesWithImages = await Promise.all(
-    safePurchases.map(async (purchase) => {
-      const image = await getFirstImageREST({
-        shop: session.shop,
-        accessToken: session.accessToken,
-        selection_type: purchase.selection_type,
-        products: purchase.products,
-        variants: purchase.variants,
-      });
+const purchasesWithImages = safePurchases;
+  // const purchasesWithImages = await Promise.all(
+  //   safePurchases.slice(0,5).map(async (purchase) => {
+  //     const image = await getFirstImageREST({
+  //       shop: session.shop,
+  //       accessToken: session.accessToken,
+  //       selection_type: purchase.selection_type,
+  //       products: purchase.products,
+  //       variants: purchase.variants,
+  //     });
 
-      return {
-        ...purchase,
-        image_url: image,
+  //     return {
+  //       ...purchase,
+  //       image_url: image,
 
-      };
-    })
-  );
+  //     };
+  //   })
+  // );
 
   return json({
     purchases: purchasesWithImages,
@@ -118,7 +124,7 @@ const safePurchases = Array.isArray(purchases) ? purchases : [];
 
 
 export const action = async ({ request }) => {
-  await authenticate.admin(request);
+
   const formData = await request.formData();
 
   const purchaseName = formData.get("purchaseName");
@@ -173,7 +179,7 @@ export const action = async ({ request }) => {
        WHERE id = $1
         AND shop = $2`,
         [purchaseId, session.shop],
-        (err, res) => (err ? reject(err) : resolve(res[0]))
+        (err, res) => (err ? reject(err) :  resolve(res.rows[0]))
       );
     });
 
@@ -459,7 +465,7 @@ console.log("themeExtensionActive:", themeExtensionActive);
             onAction: () => {
               const fd = new FormData();
               fd.set("_intent", "delete");
-              fd.set("purchase_id", deleteId);
+              fd.set("id", deleteId);
 
               fetcher.submit(fd, { method: "post" });
             },
@@ -670,7 +676,7 @@ console.log("themeExtensionActive:", themeExtensionActive);
 
                         renderItem={(item) => {
                           const {
-                            purchase_id,
+                            id,
                             purchase_option_name,
                             selection_type,
                             products,
@@ -729,7 +735,7 @@ console.log("themeExtensionActive:", themeExtensionActive);
 
                           return (
                             <ResourceItem
-                              id={purchase_id}
+                              id={id}
                               media={
                                 <Thumbnail
                                   source={mediaSource}
@@ -757,7 +763,7 @@ console.log("themeExtensionActive:", themeExtensionActive);
 
                                 <ButtonGroup>
                                   <Popover
-                                    active={activePopoverId === purchase_id}
+                                    active={activePopoverId === id}
                                     activator={
                                       <Button
                                         disclosure
@@ -807,6 +813,7 @@ console.log("themeExtensionActive:", themeExtensionActive);
                                     variant="primary"
                                     onClick={(e) => {
                                       e.stopPropagation();
+                                        console.log("👉 navigating to:", `/app/pur/${id}`);
                                       navigate(`/app/pur/${id}`);
                                     }}
                                   >
