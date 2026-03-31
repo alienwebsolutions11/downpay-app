@@ -167,7 +167,7 @@ export async function loader({ params, request }) {
     const allTags = await fetchAllShopTags(admin);
   const purchase = await new Promise((resolve, reject) => {
     db.query(
-      "SELECT * FROM purchase_table WHERE id = $1",
+      "SELECT * FROM purchase_table WHERE id = $1 ",
       [params.id],
       (err, res) => (err ? reject(err) : resolve(res.rows[0]))
     );
@@ -177,10 +177,9 @@ export async function loader({ params, request }) {
   if (!purchase) {
     throw new Response("Not Found", { status: 404 });
   }
-  if (!purchase?.selling_plan_group_id) {
-    throw new Error("Selling plan group ID missing");
-  }
-
+if (!purchase?.selling_plan_group_id) {
+  console.log("⚠️ Missing selling_plan_group_id for:", purchase?.id);
+}
   const productIds =
     purchase.products && purchase.products !== "null"
       ? purchase.products.split(",")

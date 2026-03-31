@@ -311,7 +311,7 @@ export default function Index() {
 const revalidator = useRevalidator();
   const [deleteId, setDeleteId] = useState(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
-
+const [loadingId, setLoadingId] = useState(null);
   const shopify = useAppBridge();
   const navigate = useNavigate();
   const { purchases, session_token, session_shop, totalProducts,themeExtensionActive} = useLoaderData();
@@ -321,7 +321,9 @@ const revalidator = useRevalidator();
   const [searchParams, setSearchParams] = useSearchParams();
 useEffect(() => {
   const handleFocus = () => {
+      if (!isNavigating) {
     revalidator.revalidate();
+  }
   };
 
   window.addEventListener("focus", handleFocus);
@@ -811,11 +813,16 @@ console.log("themeExtensionActive:", themeExtensionActive);
 
                                   <Button
                                     variant="primary"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                        console.log("👉 navigating to:", `/app/pur/${id}`);
-                                      navigate(`/app/pur/${id}`);
-                                    }}
+                              loading={loadingId === id}
+                                onClick={(e) => {
+  e.stopPropagation();
+
+  setLoadingId(id);  // 🚨 stop revalidation
+
+  setTimeout(() => {
+    navigate(`/app/pur/${id}`);
+  }, 50); // small delay prevents conflict
+}}
                                   >
                                     Customize
                                   </Button>
