@@ -485,9 +485,9 @@ console.log("themeExtensionActive:", themeExtensionActive);
 
 
 
-        <button variant="primary" onClick={generateProduct}>
+        {/* <button variant="primary" onClick={generateProduct}>
           Generate a product
-        </button>
+        </button> */}
       </TitleBar>
       <BlockStack gap="500">
 
