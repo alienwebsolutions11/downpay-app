@@ -1,4 +1,4 @@
-{{ product.id }}
+
 {% assign avg_rating = block.settings.product.metafields.demo.avg_rating.value | round %}
 <span style="color:{{ block.settings.colour }}">
   {% render 'stars', rating: avg_rating %}

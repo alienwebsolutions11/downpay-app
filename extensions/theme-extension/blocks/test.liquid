@@ -1,22 +1,145 @@
-{{ product.id }}
-{% assign avg_rating = block.settings.product.metafields.demo.avg_rating.value | round %}
-<span style="color:{{ block.settings.colour }}">
-  {% render 'stars', rating: avg_rating %}
-</span>
-{% if avg_rating >= 4 %}
-  <br>
-  <img src="{{ "thumbs-up.png" | asset_img_url: '15x' }}" height="15" width="15" loading="lazy">
-  {{ 'ratings.home.recommendationText' | t }}
-{% endif %}
-{{ 'muskan.js' | asset_url | script_tag }}
+{% style %}
+fieldset.options_purchase_wrapper {
+  width: 100%;
+}
+legend.options_purchase {
+  font-weight: 600;
+  width: fit-content;
+  padding: 0 5px;
+}
+.options_purchase_radio_btn {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 5px 0;
+  gap: 5px;
+}
+{% endstyle %}
+
+{% assign description = '' %}
+
+<fieldset class="options_purchase_wrapper" data-selling-plan-wrapper>
+  {% for sp_group in product.selling_plan_groups %}
+    {% if sp_group.app_id == 'newappid' %}
+
+      {% assign description = sp_group.selling_plans.first.description %}
+
+      {% for sp in sp_group.selling_plans %}
+
+        {% if sp.name == 'Updated Plan Name' %}
+          <legend class="options_purchase">
+            {{ sp.name }}
+          </legend>
+        {% endif %}
+
+        <div class="options_purchase_radio_btn">
+          <label>
+            <input 
+              type="radio"
+              name="selling_plan_option"
+              value="{{ sp.id }}"
+              data-selling-plan
+            >
+
+            {% if sp.checkout_charge.value_type == 'percentage' %}
+              {{ sp.checkout_charge.value }}% deposit
+            {% elsif sp.checkout_charge.value_type == 'fixed' %}
+              ₹{{ sp.checkout_charge.value }} deposit
+            {% endif %}
+          </label>
+        </div>
+
+      {% endfor %}
+
+      <!-- Pay in full -->
+      <div class="options_purchase_radio_btn">
+        <label>
+          <input type="radio" name="selling_plan_option" value="" data-selling-plan checked>
+          Pay in full
+        </label>
+      </div>
+
+    {% endif %}
+  {% endfor %}
+</fieldset>
+
+<p class="selling-plan-description">{{ description }}</p>
+
+<script>
+(function () {
+  function initSellingPlans() {
+    const wrapper = document.querySelector('[data-selling-plan-wrapper]');
+    if (!wrapper) return;
+
+    const form = wrapper.closest('form');
+    if (!form) return;
+
+    const radios = wrapper.querySelectorAll('input[data-selling-plan]');
+
+    radios.forEach(radio => {
+      radio.addEventListener('change', function () {
+        // Remove existing hidden input
+        form.querySelector('input[name="selling_plan"]')?.remove();
+
+        if (this.value) {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = 'selling_plan';
+          input.value = this.value;
+          form.appendChild(input);
+        }
+      });
+    });
+
+    // Handle URL preselection
+    const params = new URLSearchParams(window.location.search);
+    const planFromUrl = params.get('selling_plan');
+
+    if (planFromUrl) {
+      let matched = false;
+
+      radios.forEach(radio => {
+        if (radio.value === planFromUrl) {
+          radio.checked = true;
+          matched = true;
+
+          // trigger change manually
+          radio.dispatchEvent(new Event('change'));
+        }
+      });
+
+      if (!matched) {
+        const payFull = wrapper.querySelector('input[value=""]');
+        if (payFull) payFull.checked = true;
+      }
+    }
+
+    // Update URL on change
+    wrapper.addEventListener('change', function (e) {
+      if (e.target.matches('input[data-selling-plan]')) {
+        const url = new URL(window.location.href);
+
+        if (e.target.value) {
+          url.searchParams.set('selling_plan', e.target.value);
+        } else {
+          url.searchParams.delete('selling_plan');
+        }
+
+        window.history.replaceState({}, '', url);
+      }
+    });
+  }
+
+  // Shopify section load support
+  document.addEventListener('DOMContentLoaded', initSellingPlans);
+  document.addEventListener('shopify:section:load', initSellingPlans);
+})();
+</script>
+
 {% schema %}
 {
-  "name": "Muskan Rating",
+  "name": "Selling Plan Selector",
   "target": "section",
-  "settings": [
-    { "type": "product", "id": "product", "label": "product", "autofill": true },
-    { "type": "color", "id": "colour", "label": "Star Colour", "default": "#bb2d22" }
-  ]
+  "settings": []
 }
 {% endschema %}
-
