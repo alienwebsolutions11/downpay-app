@@ -1,14 +1,11 @@
-{% if product %}
-
-{% style %}
+<style>
 .options_purchase_radio_btn {
   display: block;
   margin-bottom: 6px;
 }
-{% endstyle %}
+</style>
 
 <fieldset data-selling-plan-wrapper>
-
   <legend>Deposit only due at checkout</legend>
 
   {% for sp_group in product.selling_plan_groups %}
@@ -28,7 +25,6 @@
 
           {% if charge.value_type == 'percentage' %}
             {{ charge.value }}% deposit
-
           {% elsif charge.value_type == 'fixed' %}
             {{ charge.value | money }} deposit
           {% endif %}
@@ -50,12 +46,10 @@
     >
     Pay full {{ product.price | money }}
   </label>
-
 </fieldset>
 
 <script>
 (function () {
-
   function initSellingPlans() {
     const wrapper = document.querySelector('[data-selling-plan-wrapper]');
     if (!wrapper) return;
@@ -83,24 +77,13 @@
 
   document.addEventListener('DOMContentLoaded', initSellingPlans);
   document.addEventListener('shopify:section:load', initSellingPlans);
-
 })();
 </script>
 
-{% else %}
-  <!-- Prevent crash -->
-  <p>Product not available</p>
-{% endif %}
-
 {% schema %}
 {
-  "name": "test",
-  "target": "section",
-  "settings": [],
-  "presets": [
-    {
-      "name": "test"
-    }
-  ]
+  "name": "Downpay",
+  "target": "product",
+  "settings": []
 }
 {% endschema %}
