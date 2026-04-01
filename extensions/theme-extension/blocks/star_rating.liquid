@@ -1,22 +1,107 @@
+{% style %}
+.options_purchase_radio_btn {
+  display: block;
+  margin-bottom: 6px;
+}
+{% endstyle %}
 
-{% assign avg_rating = block.settings.product.metafields.demo.avg_rating.value | round %}
-<span style="color:{{ block.settings.colour }}">
-  {% render 'stars', rating: avg_rating %}
-</span>
-{% if avg_rating >= 4 %}
-  <br>
-  <img src="{{ "thumbs-up.png" | asset_img_url: '15x' }}" height="15" width="15" loading="lazy">
-  {{ 'ratings.home.recommendationText' | t }}
-{% endif %}
+{% assign product_price = product.price %}
+{% style %}
+.options_purchase_radio_btn {
+  display: block;
+  margin-bottom: 6px;
+}
+{% endstyle %}
+
+<fieldset data-selling-plan-wrapper>
+
+  <legend>Deposit only due at checkout</legend>
+
+  {% for sp_group in product.selling_plan_groups %}
+    {% for sp in sp_group.selling_plans %}
+
+      {% assign charge = sp.checkout_charge %}
+
+      {% if charge and charge.value %}
+
+        <label class="options_purchase_radio_btn">
+          <input 
+            type="radio"
+            name="selling_plan_option"
+            value="{{ sp.id }}"
+            data-selling-plan
+          >
+
+          {% if charge.value_type == 'percentage' %}
+            {{ charge.value }}% deposit
+
+          {% elsif charge.value_type == 'fixed' %}
+            {{ charge.value | money }} deposit
+
+          {% endif %}
+
+        </label>
+
+      {% endif %}
+
+    {% endfor %}
+  {% endfor %}
+
+  <!-- Pay full -->
+  <label class="options_purchase_radio_btn">
+    <input 
+      type="radio"
+      name="selling_plan_option"
+      value=""
+      data-selling-plan
+      checked
+    >
+    Pay full {{ product.price | money }}
+  </label>
+
+</fieldset>
+
+<script>
+(function () {
+
+  function initSellingPlans() {
+    const wrapper = document.querySelector('[data-selling-plan-wrapper]');
+    if (!wrapper) return;
+
+    const form = document.querySelector('form[action*="/cart/add"]');
+    if (!form) return;
+
+    wrapper.addEventListener('change', function (e) {
+      if (!e.target.matches('[data-selling-plan]')) return;
+
+      // remove old
+      form.querySelector('input[name="selling_plan"]')?.remove();
+
+      // add new
+      if (e.target.value) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'selling_plan';
+        input.value = e.target.value;
+        form.appendChild(input);
+      }
+    });
+
+    // trigger default selection
+    const checked = wrapper.querySelector('[data-selling-plan]:checked');
+    if (checked) checked.dispatchEvent(new Event('change'));
+  }
+
+  document.addEventListener('DOMContentLoaded', initSellingPlans);
+  document.addEventListener('shopify:section:load', initSellingPlans);
+
+})();
+</script>
 
 {% schema %}
 {
   "name": "Star Rating",
   "target": "section",
-  "settings": [
-    { "type": "product", "id": "product", "label": "product", "autofill": true },
-    { "type": "color", "id": "colour", "label": "Star Colour", "default": "#bb2d22" }
-  ]
+  "settings": []
 }
 {% endschema %}
-
