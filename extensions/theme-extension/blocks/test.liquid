@@ -1,11 +1,5 @@
-{% style %}
-.options_purchase_radio_btn {
-  display: block;
-  margin-bottom: 6px;
-}
-{% endstyle %}
+{% if product %}
 
-{% assign product_price = product.price %}
 {% style %}
 .options_purchase_radio_btn {
   display: block;
@@ -37,7 +31,6 @@
 
           {% elsif charge.value_type == 'fixed' %}
             {{ charge.value | money }} deposit
-
           {% endif %}
 
         </label>
@@ -47,7 +40,6 @@
     {% endfor %}
   {% endfor %}
 
-  <!-- Pay full -->
   <label class="options_purchase_radio_btn">
     <input 
       type="radio"
@@ -74,10 +66,8 @@
     wrapper.addEventListener('change', function (e) {
       if (!e.target.matches('[data-selling-plan]')) return;
 
-      // remove old
       form.querySelector('input[name="selling_plan"]')?.remove();
 
-      // add new
       if (e.target.value) {
         const input = document.createElement('input');
         input.type = 'hidden';
@@ -87,7 +77,6 @@
       }
     });
 
-    // trigger default selection
     const checked = wrapper.querySelector('[data-selling-plan]:checked');
     if (checked) checked.dispatchEvent(new Event('change'));
   }
@@ -98,10 +87,20 @@
 })();
 </script>
 
+{% else %}
+  <!-- Prevent crash -->
+  <p>Product not available</p>
+{% endif %}
+
 {% schema %}
 {
   "name": "test",
   "target": "section",
-  "settings": []
+  "settings": [],
+  "presets": [
+    {
+      "name": "test"
+    }
+  ]
 }
 {% endschema %}
