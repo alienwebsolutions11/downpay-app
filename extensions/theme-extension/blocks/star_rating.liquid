@@ -5,7 +5,7 @@
 }
 </style>
 
-<!-- PRODUCT JSON (IMPORTANT) -->
+<!-- ✅ PRODUCT JSON -->
 <script>
   window.productData = {{ product | json }};
 </script>
@@ -63,6 +63,7 @@
   </label>
 
 </fieldset>
+
 <script>
 (function () {
 
@@ -86,7 +87,7 @@
     });
   }
 
-  // ✅ Get CURRENT variant ID (always works)
+  // ✅ Get current variant ID
   function getCurrentVariantId() {
     const form = document.querySelector('form[action*="/cart/add"]');
     if (!form) return null;
@@ -95,7 +96,7 @@
     return input ? input.value : null;
   }
 
-  // ✅ MAIN UPDATE
+  // ✅ Update UI (price + deposit)
   function updateUI() {
 
     const variantId = getCurrentVariantId();
@@ -109,13 +110,13 @@
 
     const price = variant.price;
 
-    // 🔹 FULL PRICE
+    // 🔹 Update full price
     const fullPrice = document.getElementById('full-price');
     if (fullPrice) {
       fullPrice.innerText = formatMoney(price);
     }
 
-    // 🔹 DEPOSIT
+    // 🔹 Update deposit
     const depositEl = document.getElementById('deposit-text');
     if (depositEl) {
 
@@ -133,20 +134,30 @@
     }
   }
 
+  // 💰 money format
   function formatMoney(cents) {
     return '$' + (cents / 100).toFixed(2);
   }
 
-  // ✅ Listen EVERY change (robust)
-  document.addEventListener('change', function(e) {
-    if (e.target.closest('form[action*="/cart/add"]')) {
-      setTimeout(updateUI, 50); // wait for Shopify to update variant
-    }
-  });
+  // 🔥 WATCH variant change (FINAL FIX)
+  function watchVariantChange() {
+    let lastVariantId = null;
+
+    setInterval(() => {
+      const currentId = getCurrentVariantId();
+
+      if (currentId && currentId !== lastVariantId) {
+        lastVariantId = currentId;
+        updateUI();
+      }
+
+    }, 200);
+  }
 
   document.addEventListener('DOMContentLoaded', function(){
     initSellingPlans();
-    updateUI(); // initial load fix
+    updateUI();
+    watchVariantChange(); // 👈 IMPORTANT
   });
 
   document.addEventListener('shopify:section:load', function(){
