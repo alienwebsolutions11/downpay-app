@@ -37,7 +37,7 @@
           data-selling-plan
         >
 
-        <span class="deposit-text"
+        <span id="deposit-text"
           data-type="{{ charge.value_type }}"
           data-value="{{ charge.value }}">
 
@@ -109,7 +109,54 @@
     const input = form.querySelector('[name="id"]');
     return input ? input.value : null;
   }
+function attachSellingPlanToForm() {
+  const form = document.querySelector('form[action*="/cart/add"]');
+  const wrapper = document.querySelector('[data-selling-plan-wrapper]');
 
+  if (!form || !wrapper) return;
+
+  // ✅ 1. Handle normal submit
+  form.addEventListener('submit', function () {
+    const selected = wrapper.querySelector('[data-selling-plan]:checked');
+
+    if (!selected || !selected.value) return;
+
+    let input = form.querySelector('input[name="selling_plan"]');
+
+    if (!input) {
+      input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'selling_plan';
+      form.appendChild(input);
+    }
+
+    input.value = selected.value;
+
+    console.log("✅ selling_plan (submit):", input.value);
+  });
+
+  // ✅ 2. Handle AJAX (MOST IMPORTANT)
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('[name="add"]')) return;
+
+    const selected = wrapper.querySelector('[data-selling-plan]:checked');
+
+    if (!selected || !selected.value) return;
+
+    let input = form.querySelector('input[name="selling_plan"]');
+
+    if (!input) {
+      input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'selling_plan';
+      form.appendChild(input);
+    }
+
+    input.value = selected.value;
+
+    console.log("🔥 selling_plan (click):", input.value);
+  });
+}
   // ✅ Update UI (price + deposit)
   function updateUI() {
 
@@ -182,6 +229,7 @@ function moveDepositBlock() {
   document.addEventListener('DOMContentLoaded', function(){
   moveDepositBlock();   // ✅ ADD THIS
   initSellingPlans();
+  attachSellingPlanToForm();
   updateUI();
   watchVariantChange(); 
 
@@ -192,6 +240,7 @@ function moveDepositBlock() {
 
   document.addEventListener('shopify:section:load', function(){
     moveDepositBlock(); 
+    attachSellingPlanToForm();
     initSellingPlans();
     updateUI();
   });
@@ -203,7 +252,7 @@ function moveDepositBlock() {
 {
   "name": "Deposit Option",
   
-  "target": "product",
+  "target": "section",
   "enabled_on": {
     "templates": ["product"]
   
