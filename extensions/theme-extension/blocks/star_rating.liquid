@@ -25,26 +25,26 @@
     {% endif %}
   {% endfor %}
 
-  {% if first_plan %}
-    {% assign charge = first_plan.checkout_charge %}
+{% if first_plan %}
+  {% assign charge = first_plan.checkout_charge %}
 
-    {% if charge and charge.value %}
-      <label class="options_purchase_radio_btn">
-        <input 
-          type="radio"
-          name="selling_plan_option"
-          value="{{ first_plan.id }}"
-          data-selling-plan
-        >
+  {% if charge %}
+    <label class="options_purchase_radio_btn">
+      <input 
+        type="radio"
+        name="selling_plan_option"
+        value="{{ first_plan.id }}"
+        data-selling-plan
+      >
 
-        {% if charge.value_type == 'percentage' %}
-          {{ charge.value }}% deposit
-        {% elsif charge.value_type == 'fixed' %}
-          {{ charge.value | money }} deposit
-        {% endif %}
-      </label>
-    {% endif %}
+      {% if charge.value_type == 'percentage' %}
+        {{ charge.value }}% deposit
+      {% elsif charge.value_type == 'fixed' %}
+        {{ charge.value | money }} deposit
+      {% endif %}
+    </label>
   {% endif %}
+{% endif %}
 
   <label class="options_purchase_radio_btn">
     <input 
