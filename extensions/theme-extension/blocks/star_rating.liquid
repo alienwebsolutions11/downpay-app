@@ -4,12 +4,11 @@
   margin-bottom: 6px;
 }
 </style>
-<style>
-.options_purchase_radio_btn {
-  display: block;
-  margin-bottom: 6px;
-}
-</style>
+
+<!-- PRODUCT JSON (IMPORTANT) -->
+<script>
+  window.productData = {{ product | json }};
+</script>
 
 <fieldset data-selling-plan-wrapper>
   <legend>Deposit only due at checkout</legend>
@@ -25,26 +24,32 @@
     {% endif %}
   {% endfor %}
 
-{% if first_plan %}
-  {% assign charge = first_plan.checkout_charge %}
+  {% if first_plan %}
+    {% assign charge = first_plan.checkout_charge %}
 
-  {% if charge %}
-    <label class="options_purchase_radio_btn">
-      <input 
-        type="radio"
-        name="selling_plan_option"
-        value="{{ first_plan.id }}"
-        data-selling-plan
-      >
+    {% if charge %}
+      <label class="options_purchase_radio_btn">
+        <input 
+          type="radio"
+          name="selling_plan_option"
+          value="{{ first_plan.id }}"
+          data-selling-plan
+        >
 
-      {% if charge.value_type == 'percentage' %}
-        {{ charge.value }}% deposit
-      {% elsif charge.value_type == 'fixed' %}
-        {{ charge.value | money }} deposit
-      {% endif %}
-    </label>
+        <span id="deposit-text"
+          data-type="{{ charge.value_type }}"
+          data-value="{{ charge.value }}">
+
+          {% if charge.value_type == 'percentage' %}
+            {{ charge.value }}% deposit
+          {% elsif charge.value_type == 'fixed' %}
+            {{ charge.value | money }} deposit
+          {% endif %}
+
+        </span>
+      </label>
+    {% endif %}
   {% endif %}
-{% endif %}
 
   <label class="options_purchase_radio_btn">
     <input 
@@ -54,13 +59,14 @@
       data-selling-plan
       checked
     >
-    Pay full {{ product.price | money }}
+    Pay full <span id="full-price">{{ product.price | money }}</span>
   </label>
 
 </fieldset>
 
 <script>
 (function () {
+
   function initSellingPlans() {
     const wrapper = document.querySelector('[data-selling-plan-wrapper]');
     if (!wrapper) return;
@@ -86,15 +92,62 @@
     if (checked) checked.dispatchEvent(new Event('change'));
   }
 
+  // 🔥 VARIANT CHANGE HANDLER
+  function handleVariantChange(e) {
+
+    if (!e.target.matches('select[name="id"], input[name="id"]')) return;
+
+    const variantId = e.target.value;
+    const product = window.productData;
+
+    if (!product) return;
+
+    const variant = product.variants.find(v => v.id == variantId);
+    if (!variant) return;
+
+    const price = variant.price;
+
+    // ✅ Update FULL PRICE
+    const priceEl = document.getElementById('full-price');
+    if (priceEl) {
+      priceEl.innerText = formatMoney(price);
+    }
+
+    // ✅ Update DEPOSIT (for percentage)
+    const depositEl = document.getElementById('deposit-text');
+    if (depositEl) {
+
+      const type = depositEl.dataset.type;
+      const value = parseFloat(depositEl.dataset.value);
+
+      if (type === 'percentage') {
+        let deposit = (price / 100) * value;
+        depositEl.innerText = value + '% deposit ($' + (deposit/100).toFixed(2) + ')';
+      }
+
+      if (type === 'fixed') {
+        depositEl.innerText = formatMoney(value);
+      }
+    }
+  }
+
+  // 💰 money formatter
+  function formatMoney(cents) {
+    return '$' + (cents / 100).toFixed(2);
+  }
+
   document.addEventListener('DOMContentLoaded', initSellingPlans);
   document.addEventListener('shopify:section:load', initSellingPlans);
+
+  document.addEventListener('change', handleVariantChange);
+
 })();
 </script>
+
 {% schema %}
 {
-  "name": "Star Rating",
+  "name": "Deposit Option",
   "target": "section",
   "settings": []
 }
 {% endschema %}
-
