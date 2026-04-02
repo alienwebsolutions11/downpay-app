@@ -167,14 +167,31 @@
 
     }, 200);
   }
+function moveDepositBlock() {
+  const block = document.querySelector('[data-selling-plan-wrapper]');
+  const form = document.querySelector('form[action*="/cart/add"]');
 
+  if (!block || !form) return;
+
+  // prevent duplicate move
+  if (!block.dataset.moved) {
+    form.prepend(block); // 🔥 puts ABOVE buy buttons
+    block.dataset.moved = "true";
+  }
+}
   document.addEventListener('DOMContentLoaded', function(){
-    initSellingPlans();
-    updateUI();
-    watchVariantChange(); 
+  moveDepositBlock();   // ✅ ADD THIS
+  initSellingPlans();
+  updateUI();
+  watchVariantChange(); 
+
+  // retry (Shopify loads async)
+  setTimeout(moveDepositBlock, 500);
+  setTimeout(moveDepositBlock, 1000);
   });
 
   document.addEventListener('shopify:section:load', function(){
+    moveDepositBlock(); 
     initSellingPlans();
     updateUI();
   });
@@ -186,7 +203,7 @@
 {
   "name": "Deposit Option",
   
-  "target": "section",
+  "target": "product",
   "enabled_on": {
     "templates": ["product"]
   
