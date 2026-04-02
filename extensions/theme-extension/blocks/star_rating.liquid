@@ -5,7 +5,6 @@
 }
 </style>
 
-<!-- ✅ PRODUCT JSON -->
 <script>
   window.productData = {{ product | json }};
 </script>
@@ -28,7 +27,6 @@
     {% assign charge = first_plan.checkout_charge %}
 
     {% if charge %}
-    
       <label class="options_purchase_radio_btn">
         <input 
           type="radio"
@@ -40,16 +38,13 @@
         <span id="deposit-text"
           data-type="{{ charge.value_type }}"
           data-value="{{ charge.value }}">
-
+          
           {% if charge.value_type == 'percentage' %}
             {{ charge.value }}% deposit
-        {% elsif charge.value_type == 'price' %}
-  {% if charge.value %}
-    {{ charge.value | money }} deposit
-  {% else %}
-    {{ first_plan.price_adjustments[0].value | money }} deposit
-  {% endif %}
-{% endif %}
+          {% elsif charge.value_type == 'price' %}
+            {{ charge.value | money }} deposit
+          {% endif %}
+
         </span>
       </label>
     {% endif %}
@@ -71,12 +66,29 @@
 <script>
 (function () {
 
- function initSellingPlans() {
+function getForm() {
+  return document.querySelector('form[action*="/cart/add"]');
+}
+
+// ✅ Move block above Add to Cart
+function moveDepositBlock() {
+  const block = document.querySelector('[data-selling-plan-wrapper]');
+  const form = getForm();
+
+  if (!block || !form) return;
+
+  if (!block.dataset.moved) {
+    form.prepend(block);
+    block.dataset.moved = "true";
+  }
+}
+
+// ✅ Apply selling plan on change
+function initSellingPlans() {
   const wrapper = document.querySelector('[data-selling-plan-wrapper]');
-  const form = document.querySelector('form[action*="/cart/add"]');
+  const form = getForm();
   if (!wrapper || !form) return;
 
-  // 🔁 On change
   wrapper.addEventListener('change', function (e) {
     if (!e.target.matches('[data-selling-plan]')) return;
 
@@ -91,159 +103,109 @@
     }
   });
 
-  // 🔥 FORCE DEFAULT = PAY FULL
-  const defaultRadio = wrapper.querySelector('[data-selling-plan][value=""]');
-  if (defaultRadio) {
-    defaultRadio.checked = true;
+  // ✅ Ensure default state applied
+  const checked = wrapper.querySelector('[data-selling-plan]:checked');
+  if (checked && checked.value) {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'selling_plan';
+    input.value = checked.value;
+    form.appendChild(input);
+  }
+}
 
-    // remove any existing selling_plan
+// ✅ FIX: Shopify AJAX submit issue
+function handleFormSubmit() {
+  document.addEventListener('submit', function (e) {
+    const form = e.target;
+    if (!form.matches('form[action*="/cart/add"]')) return;
+
+    const selected = document.querySelector('[data-selling-plan]:checked');
+    if (!selected || !selected.value) return;
+
     form.querySelector('input[name="selling_plan"]')?.remove();
-  }
-}
 
-  // ✅ Get current variant ID
-  function getCurrentVariantId() {
-    const form = document.querySelector('form[action*="/cart/add"]');
-    if (!form) return null;
-
-    const input = form.querySelector('[name="id"]');
-    return input ? input.value : null;
-  }
-function attachSellingPlanToForm() {
-  const form = document.querySelector('form[action*="/cart/add"]');
-  const wrapper = document.querySelector('[data-selling-plan-wrapper]');
-
-  if (!form || !wrapper) return;
-
-  // ✅ 1. Handle normal submit
-  form.addEventListener('submit', function () {
-    const selected = wrapper.querySelector('[data-selling-plan]:checked');
-
-    if (!selected || !selected.value) return;
-
-    let input = form.querySelector('input[name="selling_plan"]');
-
-    if (!input) {
-      input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = 'selling_plan';
-      form.appendChild(input);
-    }
-
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'selling_plan';
     input.value = selected.value;
-
-    console.log("✅ selling_plan (submit):", input.value);
-  });
-
-  // ✅ 2. Handle AJAX (MOST IMPORTANT)
-  document.addEventListener('click', function (e) {
-    if (!e.target.closest('[name="add"]')) return;
-
-    const selected = wrapper.querySelector('[data-selling-plan]:checked');
-
-    if (!selected || !selected.value) return;
-
-    let input = form.querySelector('input[name="selling_plan"]');
-
-    if (!input) {
-      input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = 'selling_plan';
-      form.appendChild(input);
-    }
-
-    input.value = selected.value;
-
-    console.log("🔥 selling_plan (click):", input.value);
+    form.appendChild(input);
   });
 }
-  // ✅ Update UI (price + deposit)
-  function updateUI() {
 
-    const variantId = getCurrentVariantId();
-    if (!variantId) return;
+// ✅ Variant price update
+function updateUI() {
+  const form = getForm();
+  if (!form) return;
 
-    const product = window.productData;
-    if (!product) return;
+  const variantId = form.querySelector('[name="id"]')?.value;
+  if (!variantId) return;
 
-    const variant = product.variants.find(v => v.id == variantId);
-    if (!variant) return;
+  const product = window.productData;
+  const variant = product.variants.find(v => v.id == variantId);
+  if (!variant) return;
 
-    const price = variant.price;
+  const price = variant.price;
 
-    // 🔹 Update full price
-    const fullPrice = document.getElementById('full-price');
-    if (fullPrice) {
-      fullPrice.innerText = formatMoney(price);
+  const fullPrice = document.getElementById('full-price');
+  if (fullPrice) {
+    fullPrice.innerText = formatMoney(price);
+  }
+
+  const depositEl = document.getElementById('deposit-text');
+  if (depositEl) {
+    const type = depositEl.dataset.type;
+    const value = parseFloat(depositEl.dataset.value);
+
+    if (type === 'percentage') {
+      let deposit = (price * value) / 100;
+      depositEl.innerText = value + '% deposit ($' + (deposit/100).toFixed(2) + ')';
     }
 
-    // 🔹 Update deposit
-    const depositEl = document.getElementById('deposit-text');
-    if (depositEl) {
-
-      const type = depositEl.dataset.type;
-      const value = parseFloat(depositEl.dataset.value);
-
-      if (type === 'percentage') {
-        let deposit = (price * value) / 100;
-        depositEl.innerText = value + '% deposit ($' + (deposit/100).toFixed(2) + ')';
-      }
-
-      if (type === 'price') {
-        depositEl.innerText = formatMoney(value);
-      }
+    if (type === 'price') {
+      depositEl.innerText = formatMoney(value);
     }
-  }
-
-  // 💰 money format
-  function formatMoney(cents) {
-    return '$' + (cents / 100).toFixed(2);
-  }
-
-  // 🔥 WATCH variant change (FINAL FIX)
-  function watchVariantChange() {
-    let lastVariantId = null;
-
-    setInterval(() => {
-      const currentId = getCurrentVariantId();
-
-      if (currentId && currentId !== lastVariantId) {
-        lastVariantId = currentId;
-        updateUI();
-      }
-
-    }, 200);
-  }
-function moveDepositBlock() {
-  const block = document.querySelector('[data-selling-plan-wrapper]');
-  const form = document.querySelector('form[action*="/cart/add"]');
-
-  if (!block || !form) return;
-
-  // prevent duplicate move
-  if (!block.dataset.moved) {
-    form.prepend(block); // 🔥 puts ABOVE buy buttons
-    block.dataset.moved = "true";
   }
 }
-  document.addEventListener('DOMContentLoaded', function(){
-  moveDepositBlock();   // ✅ ADD THIS
+
+function formatMoney(cents) {
+  return '$' + (cents / 100).toFixed(2);
+}
+
+// ✅ Watch variant change
+function watchVariantChange() {
+  let lastId = null;
+
+  setInterval(() => {
+    const form = getForm();
+    if (!form) return;
+
+    const currentId = form.querySelector('[name="id"]')?.value;
+
+    if (currentId && currentId !== lastId) {
+      lastId = currentId;
+      updateUI();
+    }
+  }, 200);
+}
+
+// 🚀 INIT
+document.addEventListener('DOMContentLoaded', function(){
+  moveDepositBlock();
   initSellingPlans();
-  attachSellingPlanToForm();
+  handleFormSubmit();
   updateUI();
-  watchVariantChange(); 
+  watchVariantChange();
 
-  // retry (Shopify loads async)
   setTimeout(moveDepositBlock, 500);
   setTimeout(moveDepositBlock, 1000);
-  });
+});
 
-  document.addEventListener('shopify:section:load', function(){
-    moveDepositBlock(); 
-    attachSellingPlanToForm();
-    initSellingPlans();
-    updateUI();
-  });
+document.addEventListener('shopify:section:load', function(){
+  moveDepositBlock();
+  initSellingPlans();
+  updateUI();
+});
 
 })();
 </script>
@@ -251,12 +213,10 @@ function moveDepositBlock() {
 {% schema %}
 {
   "name": "Deposit Option",
-  
   "target": "section",
   "enabled_on": {
     "templates": ["product"]
-  
-},
+  },
   "settings": []
 }
 {% endschema %}
