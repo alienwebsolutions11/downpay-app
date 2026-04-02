@@ -28,6 +28,7 @@
     {% assign charge = first_plan.checkout_charge %}
 
     {% if charge %}
+    
       <label class="options_purchase_radio_btn">
         <input 
           type="radio"
@@ -42,10 +43,13 @@
 
           {% if charge.value_type == 'percentage' %}
             {{ charge.value }}% deposit
-          {% elsif charge.value_type == 'fixed' %}
-            {{ charge.value | money }} deposit
-          {% endif %}
-
+        {% elsif charge.value_type == 'price' %}
+  {% if charge.value %}
+    {{ charge.value | money }} deposit
+  {% else %}
+    {{ first_plan.price_adjustments[0].value | money }} deposit
+  {% endif %}
+{% endif %}
         </span>
       </label>
     {% endif %}
@@ -67,25 +71,35 @@
 <script>
 (function () {
 
-  function initSellingPlans() {
-    const wrapper = document.querySelector('[data-selling-plan-wrapper]');
-    const form = document.querySelector('form[action*="/cart/add"]');
-    if (!wrapper || !form) return;
+ function initSellingPlans() {
+  const wrapper = document.querySelector('[data-selling-plan-wrapper]');
+  const form = document.querySelector('form[action*="/cart/add"]');
+  if (!wrapper || !form) return;
 
-    wrapper.addEventListener('change', function (e) {
-      if (!e.target.matches('[data-selling-plan]')) return;
+  // 🔁 On change
+  wrapper.addEventListener('change', function (e) {
+    if (!e.target.matches('[data-selling-plan]')) return;
 
-      form.querySelector('input[name="selling_plan"]')?.remove();
+    form.querySelector('input[name="selling_plan"]')?.remove();
 
-      if (e.target.value) {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'selling_plan';
-        input.value = e.target.value;
-        form.appendChild(input);
-      }
-    });
+    if (e.target.value) {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'selling_plan';
+      input.value = e.target.value;
+      form.appendChild(input);
+    }
+  });
+
+  // 🔥 FORCE DEFAULT = PAY FULL
+  const defaultRadio = wrapper.querySelector('[data-selling-plan][value=""]');
+  if (defaultRadio) {
+    defaultRadio.checked = true;
+
+    // remove any existing selling_plan
+    form.querySelector('input[name="selling_plan"]')?.remove();
   }
+}
 
   // ✅ Get current variant ID
   function getCurrentVariantId() {
@@ -128,7 +142,7 @@
         depositEl.innerText = value + '% deposit ($' + (deposit/100).toFixed(2) + ')';
       }
 
-      if (type === 'fixed') {
+      if (type === 'price') {
         depositEl.innerText = formatMoney(value);
       }
     }
