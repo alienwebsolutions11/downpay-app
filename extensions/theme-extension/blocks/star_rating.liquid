@@ -4,37 +4,47 @@
   margin-bottom: 6px;
 }
 </style>
+<style>
+.options_purchase_radio_btn {
+  display: block;
+  margin-bottom: 6px;
+}
+</style>
 
 <fieldset data-selling-plan-wrapper>
   <legend>Deposit only due at checkout</legend>
 
+  {% assign first_plan = null %}
+
   {% for sp_group in product.selling_plan_groups %}
-    {% for sp in sp_group.selling_plans %}
-
-      {% assign charge = sp.checkout_charge %}
-
-      {% if charge and charge.value %}
-
-        <label class="options_purchase_radio_btn">
-          <input 
-            type="radio"
-            name="selling_plan_option"
-            value="{{ sp.id }}"
-            data-selling-plan
-          >
-
-          {% if charge.value_type == 'percentage' %}
-            {{ charge.value }}% deposit
-          {% elsif charge.value_type == 'fixed' %}
-            {{ charge.value | money }} deposit
-          {% endif %}
-
-        </label>
-
-      {% endif %}
-
-    {% endfor %}
+    {% if first_plan == null %}
+      {% for sp in sp_group.selling_plans %}
+        {% assign first_plan = sp %}
+        {% break %}
+      {% endfor %}
+    {% endif %}
   {% endfor %}
+
+  {% if first_plan %}
+    {% assign charge = first_plan.checkout_charge %}
+
+    {% if charge and charge.value %}
+      <label class="options_purchase_radio_btn">
+        <input 
+          type="radio"
+          name="selling_plan_option"
+          value="{{ first_plan.id }}"
+          data-selling-plan
+        >
+
+        {% if charge.value_type == 'percentage' %}
+          {{ charge.value }}% deposit
+        {% elsif charge.value_type == 'fixed' %}
+          {{ charge.value | money }} deposit
+        {% endif %}
+      </label>
+    {% endif %}
+  {% endif %}
 
   <label class="options_purchase_radio_btn">
     <input 
@@ -46,6 +56,7 @@
     >
     Pay full {{ product.price | money }}
   </label>
+
 </fieldset>
 
 <script>
@@ -83,10 +94,7 @@
 {
   "name": "Star Rating",
   "target": "section",
-  "settings": [
-    { "type": "product", "id": "product", "label": "product", "autofill": true },
-    { "type": "color", "id": "colour", "label": "Star Colour", "default": "#bb2d22" }
-  ]
+  "settings": []
 }
 {% endschema %}
 

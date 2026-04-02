@@ -310,14 +310,13 @@ export async function isThemeBlockActive({ shop, accessToken }) {
     for (const section of Object.values(sections)) {
       const blocks = section.blocks || {};
 for (const block of Object.values(blocks)) {
-  if (
-    typeof block.type === "string" &&
-    (
-      block.type === "@app" ||
-      block.type.startsWith("app://apps/") ||
-      block.type.startsWith("shopify://apps/")
-    )
-  ) {
+if (
+  typeof block.type === "string" &&
+  block.type.includes("/blocks/")
+) {
+  console.log("✅ REAL APP BLOCK FOUND:", block.type);
+  return true;
+} {
     console.log("✅ REAL APP BLOCK FOUND:", block.type);
     return true;
   }
