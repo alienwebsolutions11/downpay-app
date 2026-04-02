@@ -63,16 +63,13 @@
   </label>
 
 </fieldset>
-
 <script>
 (function () {
 
   function initSellingPlans() {
     const wrapper = document.querySelector('[data-selling-plan-wrapper]');
-    if (!wrapper) return;
-
     const form = document.querySelector('form[action*="/cart/add"]');
-    if (!form) return;
+    if (!wrapper || !form) return;
 
     wrapper.addEventListener('change', function (e) {
       if (!e.target.matches('[data-selling-plan]')) return;
@@ -87,19 +84,24 @@
         form.appendChild(input);
       }
     });
-
-    const checked = wrapper.querySelector('[data-selling-plan]:checked');
-    if (checked) checked.dispatchEvent(new Event('change'));
   }
 
-  // 🔥 VARIANT CHANGE HANDLER
-  function handleVariantChange(e) {
+  // ✅ Get CURRENT variant ID (always works)
+  function getCurrentVariantId() {
+    const form = document.querySelector('form[action*="/cart/add"]');
+    if (!form) return null;
 
-    if (!e.target.matches('select[name="id"], input[name="id"]')) return;
+    const input = form.querySelector('[name="id"]');
+    return input ? input.value : null;
+  }
 
-    const variantId = e.target.value;
+  // ✅ MAIN UPDATE
+  function updateUI() {
+
+    const variantId = getCurrentVariantId();
+    if (!variantId) return;
+
     const product = window.productData;
-
     if (!product) return;
 
     const variant = product.variants.find(v => v.id == variantId);
@@ -107,13 +109,13 @@
 
     const price = variant.price;
 
-    // ✅ Update FULL PRICE
-    const priceEl = document.getElementById('full-price');
-    if (priceEl) {
-      priceEl.innerText = formatMoney(price);
+    // 🔹 FULL PRICE
+    const fullPrice = document.getElementById('full-price');
+    if (fullPrice) {
+      fullPrice.innerText = formatMoney(price);
     }
 
-    // ✅ Update DEPOSIT (for percentage)
+    // 🔹 DEPOSIT
     const depositEl = document.getElementById('deposit-text');
     if (depositEl) {
 
@@ -121,7 +123,7 @@
       const value = parseFloat(depositEl.dataset.value);
 
       if (type === 'percentage') {
-        let deposit = (price / 100) * value;
+        let deposit = (price * value) / 100;
         depositEl.innerText = value + '% deposit ($' + (deposit/100).toFixed(2) + ')';
       }
 
@@ -131,15 +133,26 @@
     }
   }
 
-  // 💰 money formatter
   function formatMoney(cents) {
     return '$' + (cents / 100).toFixed(2);
   }
 
-  document.addEventListener('DOMContentLoaded', initSellingPlans);
-  document.addEventListener('shopify:section:load', initSellingPlans);
+  // ✅ Listen EVERY change (robust)
+  document.addEventListener('change', function(e) {
+    if (e.target.closest('form[action*="/cart/add"]')) {
+      setTimeout(updateUI, 50); // wait for Shopify to update variant
+    }
+  });
 
-  document.addEventListener('change', handleVariantChange);
+  document.addEventListener('DOMContentLoaded', function(){
+    initSellingPlans();
+    updateUI(); // initial load fix
+  });
+
+  document.addEventListener('shopify:section:load', function(){
+    initSellingPlans();
+    updateUI();
+  });
 
 })();
 </script>
