@@ -630,7 +630,7 @@ console.log("themeExtensionActive:", themeExtensionActive);
  variant="plain"
     onClick={() =>
       window.open(
-       `https://${session_shop}/admin/themes/current/editor?template=product&addAppBlockId=c6484a6284a9cfd6bf8d72ac8b120813/test&target=newAppsSection`,
+       `https://${session_shop}/admin/themes/current/editor?template=product&addAppBlockId=c6484a6284a9cfd6bf8d72ac8b120813/star_rating&target=newAppsSection`,
       "_blank"
       )
     }

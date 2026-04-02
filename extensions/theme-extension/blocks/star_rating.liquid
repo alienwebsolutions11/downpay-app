@@ -1,3 +1,4 @@
+
 <style>
 .options_purchase_radio_btn {
   display: block;
@@ -79,11 +80,13 @@
   document.addEventListener('shopify:section:load', initSellingPlans);
 })();
 </script>
-
-{% schema %}
 {
-  "name": "Downpay",
-  "target": "product",
-  "settings": []
+  "name": "Star Rating",
+  "target": "section",
+  "settings": [
+    { "type": "product", "id": "product", "label": "product", "autofill": true },
+    { "type": "color", "id": "colour", "label": "Star Colour", "default": "#bb2d22" }
+  ]
 }
 {% endschema %}
+
