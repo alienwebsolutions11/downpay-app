@@ -47,184 +47,188 @@
 
 <script>
 (function () {
-  // ✅ STEP 1: ADD HERE
-  let CURRENT_SELLING_PLAN = '';
-  function getForm() {
-    return document.querySelector('form[action*="/cart/add"]');
+
+  let initialized = false;
+
+  function getSelectedSellingPlan() {
+    const el = document.querySelector('[data-selling-plan]:checked');
+    return el ? el.value : '';
   }
 
-function getSelectedSellingPlan() {
-  return CURRENT_SELLING_PLAN;
-}
-function watchSellingPlanSelection() {
-  document.addEventListener('change', function (e) {
-    if (e.target.matches('[data-selling-plan]')) {
-      CURRENT_SELLING_PLAN = e.target.value;
-      console.log('🧠 Stored selling plan:', CURRENT_SELLING_PLAN);
-    }
-  });
-}
-function restoreSelection() {
-  if (!CURRENT_SELLING_PLAN) return;
+  /* --------------------------
+     1️⃣ FETCH PATCH (AJAX)
+  -------------------------- */
+  function patchFetch() {
+    if (window.__sp_fetch_patched) return;
+    window.__sp_fetch_patched = true;
 
-  const el = document.querySelector(
-    `[data-selling-plan][value="${CURRENT_SELLING_PLAN}"]`
-  );
+    const originalFetch = window.fetch;
 
-  if (el) {
-    el.checked = true;
-    console.log('♻️ Restored selling plan');
+    window.fetch = async function (url, options) {
+      if (
+        typeof url === 'string' &&
+        (url.includes('/cart/add') || url.includes('/cart/add.js')) &&
+        options?.body
+      ) {
+        try {
+          const sp = getSelectedSellingPlan();
+          if (!sp) return originalFetch.apply(this, arguments);
+
+          if (options.headers?.['Content-Type']?.includes('application/json')) {
+            let body = JSON.parse(options.body);
+
+            if (Array.isArray(body.items)) {
+              body.items = body.items.map(item => ({
+                ...item,
+                selling_plan: sp
+              }));
+            } else {
+              body.selling_plan = sp;
+            }
+
+            options.body = JSON.stringify(body);
+          }
+
+          else if (options.body instanceof FormData) {
+            options.body.set('selling_plan', sp);
+          }
+
+        } catch (e) {
+          console.error('Fetch patch error', e);
+        }
+      }
+
+      return originalFetch.apply(this, arguments);
+    };
   }
-}
-function observeDOM() {
-  const observer = new MutationObserver(() => {
-    restoreSelection();
-  });
 
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true
-  });
-}
-  // 🔥 CORE FIX: intercept Dawn fetch
-function patchFetch() {
-  const originalFetch = window.fetch;
+  /* --------------------------
+     2️⃣ XHR PATCH (OLD THEMES)
+  -------------------------- */
+  function patchXHR() {
+    if (window.__sp_xhr_patched) return;
+    window.__sp_xhr_patched = true;
 
-  window.fetch = async function (url, options) {
+    const origOpen = XMLHttpRequest.prototype.open;
+    const origSend = XMLHttpRequest.prototype.send;
 
-    if (
-      typeof url === 'string' &&
-      (url.includes('/cart/add') || url.includes('/cart/add.js')) &&
-      options &&
-      options.body
-    ) {
-      try {
+    XMLHttpRequest.prototype.open = function (method, url) {
+      this._url = url;
+      return origOpen.apply(this, arguments);
+    };
+
+    XMLHttpRequest.prototype.send = function (body) {
+
+      if (this._url && this._url.includes('/cart/add')) {
+        try {
+          const sp = getSelectedSellingPlan();
+          if (!sp) return origSend.apply(this, arguments);
+
+          // JSON
+          if (typeof body === 'string' && body.includes('{')) {
+            let data = JSON.parse(body);
+
+            if (Array.isArray(data.items)) {
+              data.items = data.items.map(item => ({
+                ...item,
+                selling_plan: sp
+              }));
+            } else {
+              data.selling_plan = sp;
+            }
+
+            body = JSON.stringify(data);
+          }
+
+          // FormData
+          else if (body instanceof FormData) {
+            body.set('selling_plan', sp);
+          }
+
+        } catch (e) {
+          console.error('XHR patch error', e);
+        }
+      }
+
+      return origSend.call(this, body);
+    };
+  }
+
+  /* --------------------------
+     3️⃣ FORM SUBMIT (NON AJAX)
+  -------------------------- */
+  function patchFormSubmit() {
+    document.addEventListener('submit', function (e) {
+      const form = e.target;
+
+      if (form.action && form.action.includes('/cart/add')) {
         const sp = getSelectedSellingPlan();
-        if (!sp) return originalFetch.apply(this, arguments);
+        if (!sp) return;
 
-        // ✅ JSON BODY
-        if (options.headers?.['Content-Type']?.includes('application/json')) {
-          let body = JSON.parse(options.body);
+        let input = form.querySelector('[name="selling_plan"]');
 
-          // 🔥 CASE 1: items array (Dawn, Refresh, etc.)
-          if (Array.isArray(body.items)) {
-            body.items = body.items.map(item => ({
-              ...item,
-              selling_plan: sp
-            }));
-            console.log('✅ Injected selling_plan into items[]:', sp);
-          }
-
-          // 🔥 CASE 2: direct object
-          else {
-            body.selling_plan = sp;
-            console.log('✅ Injected selling_plan (root):', sp);
-          }
-
-          options.body = JSON.stringify(body);
+        if (!input) {
+          input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = 'selling_plan';
+          form.appendChild(input);
         }
 
-        // ✅ FORM DATA
-        else if (options.body instanceof FormData) {
-          options.body.set('selling_plan', sp);
-          console.log('✅ Injected selling_plan (FormData):', sp);
-        }
-
-      } catch (e) {
-        console.error('Fetch patch error', e);
+        input.value = sp;
       }
-    }
-
-    return originalFetch.apply(this, arguments);
-  };
-}
-function patchFormSubmit() {
-  document.addEventListener('submit', function (e) {
-    const form = e.target;
-
-    if (form.action && form.action.includes('/cart/add')) {
-      const sp = getSelectedSellingPlan();
-      if (!sp) return;
-
-      let input = form.querySelector('[name="selling_plan"]');
-
-      if (!input) {
-        input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'selling_plan';
-        form.appendChild(input);
-      }
-
-      input.value = sp;
-
-      console.log('✅ Injected selling_plan via form submit:', sp);
-    }
-  });
-}
-  // UI sync (optional but good)
-  function updateUI() {
-    const form = getForm();
-    if (!form) return;
-
-    const variantId = form.querySelector('[name="id"]')?.value;
-    if (!variantId) return;
-
-    const variant = window.productData?.variants?.find(v => v.id == variantId);
-    if (!variant) return;
-
-    const price = variant.price;
-
-    const full = document.getElementById('full-price');
-    if (full) full.textContent = '$' + (price / 100).toFixed(2);
-
-    const dep = document.getElementById('deposit-text');
-    if (dep) {
-      const type = dep.dataset.type;
-      const val = parseFloat(dep.dataset.value);
-
-      if (type === 'percentage') {
-        const amt = (price * val) / 100;
-        dep.textContent = `${val}% deposit ($${(amt / 100).toFixed(2)})`;
-      } else {
-        dep.textContent = '$' + (val / 100).toFixed(2) + ' deposit';
-      }
-    }
+    });
   }
 
-  function watchVariant() {
-    let last;
-    setInterval(() => {
-      const id = getForm()?.querySelector('[name="id"]')?.value;
-      if (id && id !== last) {
-        last = id;
-        updateUI();
+  /* --------------------------
+     4️⃣ RE-INIT ON EVERY LOAD
+  -------------------------- */
+  function observeDOM() {
+    const observer = new MutationObserver(() => {
+      attachEvents();
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  }
+
+  function attachEvents() {
+    // Force radios to persist (important for Dawn)
+    const radios = document.querySelectorAll('[data-selling-plan]');
+    radios.forEach(radio => {
+      radio.addEventListener('change', () => {
+        window.__selected_sp = radio.value;
+      });
+
+      // restore selection
+      if (window.__selected_sp && radio.value == window.__selected_sp) {
+        radio.checked = true;
       }
-    }, 300);
+    });
   }
 
- function init() {
-  patchFetch();
-  patchFormSubmit();
+  /* --------------------------
+     INIT
+  -------------------------- */
+  function init() {
+    if (initialized) return;
+    initialized = true;
 
-  watchSellingPlanSelection(); // ✅ NEW
-  observeDOM();                // ✅ NEW
+    patchFetch();
+    patchXHR();
+    patchFormSubmit();
+    observeDOM();
+    attachEvents();
 
-  updateUI();
-  watchVariant();
-
-  // ✅ set default on load
-  const checked = document.querySelector('[data-selling-plan]:checked');
-  if (checked) {
-    CURRENT_SELLING_PLAN = checked.value;
+    console.log('✅ Selling Plan Universal Patch Loaded');
   }
-}
 
   document.addEventListener('DOMContentLoaded', init);
   document.addEventListener('shopify:section:load', init);
 
 })();
 </script>
-
 {% schema %}
 {
   "name": "Deposit Option",
