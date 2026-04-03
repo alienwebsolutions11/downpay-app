@@ -7,16 +7,6 @@
 
 <script>
   window.productData = {{ product | json }};
-
-  // 🔥 fallback if product is missing
-  if (!window.productData || !window.productData.id) {
-    fetch(window.location.pathname + ".js")
-      .then(res => res.json())
-      .then(data => {
-        window.productData = data;
-        console.log("✅ Product loaded via AJAX", data);
-      });
-  }
 </script>
 
 <fieldset data-selling-plan-wrapper>
@@ -75,9 +65,9 @@
 
 <script>
 (function () {
-  console.log("productData:", window.productData); // ✅ ADD HERE
+
 function getForm() {
-  return document.querySelector('form[action*="/cart/add"], form[data-product-form], product-form form');
+  return document.querySelector('form[action*="/cart/add"]');
 }
 
 // ✅ Move block above Add to Cart
@@ -128,16 +118,10 @@ function initSellingPlans() {
 function handleFormSubmit() {
   document.addEventListener('submit', function (e) {
     const form = e.target;
-
-    if (!form.matches('form')) return;
-
-    if (!form.querySelector('[name="id"]')) return; // ensure product form
+    if (!form.matches('form[action*="/cart/add"]')) return;
 
     const selected = document.querySelector('[data-selling-plan]:checked');
-
     if (!selected || !selected.value) return;
-
-    console.log("🔥 Injecting selling plan:", selected.value);
 
     form.querySelector('input[name="selling_plan"]')?.remove();
 
@@ -145,7 +129,6 @@ function handleFormSubmit() {
     input.type = 'hidden';
     input.name = 'selling_plan';
     input.value = selected.value;
-
     form.appendChild(input);
   });
 }
@@ -207,22 +190,16 @@ function watchVariantChange() {
 }
 
 // 🚀 INIT
-function waitForProduct() {
-  if (!window.productData || !window.productData.variants) {
-    setTimeout(waitForProduct, 100);
-    return;
-  }
-
-  console.log("🔥 Product ready:", window.productData);
-
+document.addEventListener('DOMContentLoaded', function(){
   moveDepositBlock();
   initSellingPlans();
   handleFormSubmit();
   updateUI();
   watchVariantChange();
-}
 
-document.addEventListener('DOMContentLoaded', waitForProduct);
+  setTimeout(moveDepositBlock, 500);
+  setTimeout(moveDepositBlock, 1000);
+});
 
 document.addEventListener('shopify:section:load', function(){
   moveDepositBlock();
