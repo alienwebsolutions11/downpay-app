@@ -48,90 +48,106 @@
 <script>
 (function () {
 
+  function getForm() {
+    return document.querySelector('form[action*="/cart/add"]');
+  }
+
   function getSelectedSellingPlan() {
     const el = document.querySelector('[data-selling-plan]:checked');
     return el ? el.value : '';
   }
 
-  /* =====================================
-     🔥 1. HANDLE DAWN / MODERN THEMES
-     (product-form.js based themes)
-  ===================================== */
-  document.addEventListener('product:submit', function (event) {
+  // 🔥 CORE FIX: intercept Dawn fetch
+  function patchFetch() {
+    const originalFetch = window.fetch;
 
-    try {
-      const sp = getSelectedSellingPlan();
-      if (!sp) return;
+    window.fetch = async function (url, options) {
 
-      const formData = event.detail?.formData;
+      if (
+        typeof url === 'string' &&
+        url.includes('/cart/add') &&
+        options &&
+        options.body
+      ) {
+        try {
+          let body;
 
-      if (formData) {
-        formData.set('selling_plan', sp);
-        console.log('✅ selling_plan added (product:submit)', sp);
+          // handle JSON body (Dawn default)
+          if (options.headers?.['Content-Type']?.includes('application/json')) {
+            body = JSON.parse(options.body);
+
+            const sp = getSelectedSellingPlan();
+            if (sp) {
+              body.selling_plan = sp;
+              console.log('✅ Injected selling_plan (JSON):', sp);
+            }
+
+            options.body = JSON.stringify(body);
+          }
+
+          // handle FormData (fallback themes)
+          else if (options.body instanceof FormData) {
+            const sp = getSelectedSellingPlan();
+            if (sp) {
+              options.body.set('selling_plan', sp);
+              console.log('✅ Injected selling_plan (FormData):', sp);
+            }
+          }
+
+        } catch (e) {
+          console.error('Fetch patch error', e);
+        }
       }
 
-    } catch (e) {
-      console.error('Error in product:submit', e);
+      return originalFetch.apply(this, arguments);
+    };
+  }
+
+  // UI sync (optional but good)
+  function updateUI() {
+    const form = getForm();
+    if (!form) return;
+
+    const variantId = form.querySelector('[name="id"]')?.value;
+    if (!variantId) return;
+
+    const variant = window.productData?.variants?.find(v => v.id == variantId);
+    if (!variant) return;
+
+    const price = variant.price;
+
+    const full = document.getElementById('full-price');
+    if (full) full.textContent = '$' + (price / 100).toFixed(2);
+
+    const dep = document.getElementById('deposit-text');
+    if (dep) {
+      const type = dep.dataset.type;
+      const val = parseFloat(dep.dataset.value);
+
+      if (type === 'percentage') {
+        const amt = (price * val) / 100;
+        dep.textContent = `${val}% deposit ($${(amt / 100).toFixed(2)})`;
+      } else {
+        dep.textContent = '$' + (val / 100).toFixed(2) + ' deposit';
+      }
     }
-
-  });
-
-
-  /* =====================================
-     🔥 2. FALLBACK (NON-DAWN THEMES)
-  ===================================== */
-  function attachFallback() {
-
-    const forms = document.querySelectorAll('form[action*="/cart/add"]');
-
-    forms.forEach(form => {
-
-      if (form.dataset.spBound) return;
-      form.dataset.spBound = "true";
-
-      form.addEventListener('submit', function () {
-
-        const sp = getSelectedSellingPlan();
-
-        let existing = form.querySelector('[name="selling_plan"]');
-        if (existing) existing.remove();
-
-        if (sp) {
-          const input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = 'selling_plan';
-          input.value = sp;
-          form.appendChild(input);
-
-          console.log('✅ selling_plan added (fallback form)', sp);
-        }
-
-      });
-
-    });
   }
 
-
-  /* =====================================
-     🔁 HANDLE DYNAMIC LOAD (DAWN SECTIONS)
-  ===================================== */
-  function observeDOM() {
-
-    const observer = new MutationObserver(() => {
-      attachFallback();
-    });
-
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-
+  function watchVariant() {
+    let last;
+    setInterval(() => {
+      const id = getForm()?.querySelector('[name="id"]')?.value;
+      if (id && id !== last) {
+        last = id;
+        updateUI();
+      }
+    }, 300);
   }
-
 
   function init() {
-    attachFallback();
-    observeDOM();
+    patchFetch();   // 🔥 IMPORTANT
+    updateUI();
+    watchVariant();
   }
 
   document.addEventListener('DOMContentLoaded', init);
