@@ -14,35 +14,23 @@
 
   {% assign first_plan = null %}
   {% for sp_group in product.selling_plan_groups %}
-    {% if first_plan == null %}
-      {% for sp in sp_group.selling_plans %}
-        {% assign first_plan = sp %}
-        {% break %}
-      {% endfor %}
-    {% endif %}
+    {% for sp in sp_group.selling_plans %}
+      {% assign first_plan = sp %}
+      {% break %}
+    {% endfor %}
+    {% if first_plan %}{% break %}{% endif %}
   {% endfor %}
 
   {% if first_plan %}
-    {% assign charge = first_plan.checkout_charge %}
-    {% if charge %}
-      <label class="options_purchase_radio_btn">
-        <input 
-          type="radio"
-          name="selling_plan_option"
-          value="{{ first_plan.id }}"
-          data-selling-plan
-        >
-        <span id="deposit-text"
-          data-type="{{ charge.value_type }}"
-          data-value="{{ charge.value }}">
-          {% if charge.value_type == 'percentage' %}
-            {{ charge.value }}% deposit
-          {% elsif charge.value_type == 'price' %}
-            {{ charge.value | money }} deposit
-          {% endif %}
-        </span>
-      </label>
-    {% endif %}
+    <label class="options_purchase_radio_btn">
+      <input 
+        type="radio"
+        name="selling_plan_option"
+        value="{{ first_plan.id }}"
+        data-selling-plan
+      >
+      Deposit
+    </label>
   {% endif %}
 
   <label class="options_purchase_radio_btn">
@@ -53,7 +41,7 @@
       data-selling-plan
       checked
     >
-    Pay full <span id="full-price">{{ product.price | money }}</span>
+    Pay full
   </label>
 </fieldset>
 
@@ -75,11 +63,11 @@
 
       console.log("👉 selling_plan:", sellingPlanId);
 
-      // remove old
+      // always remove old
       form.querySelectorAll('input[name="selling_plan"]').forEach(el => el.remove());
 
       if (sellingPlanId) {
-        // add hidden input (fallback for non-AJAX themes)
+        // hidden input (fallback)
         const input = document.createElement('input');
         input.type = 'hidden';
         input.name = 'selling_plan';
@@ -87,10 +75,10 @@
         form.appendChild(input);
       }
 
-      // if no selling plan → normal behavior
+      // 👉 NO deposit selected → let theme work normally
       if (!sellingPlanId) return;
 
-      // 🚨 override Dawn
+      // 🚨 FORCE WORK ON DAWN
       e.preventDefault();
       e.stopImmediatePropagation();
 
@@ -98,7 +86,7 @@
       const quantity = parseInt(form.querySelector('[name="quantity"]')?.value || 1);
 
       if (!variantId) {
-        console.error("❌ No variant ID");
+        console.error("❌ No variantId");
         return;
       }
 
@@ -118,16 +106,16 @@
       .then(data => {
         console.log("✅ Added with selling_plan:", sellingPlanId);
 
-        // refresh Dawn cart
+        // Dawn cart refresh
         document.dispatchEvent(new CustomEvent('cart:added', { detail: data }));
         document.dispatchEvent(new Event('cart:refresh'));
       })
       .catch(err => {
-        console.error(err);
+        console.error("❌ error", err);
         form.submit(); // fallback
       });
 
-    }, true); // VERY IMPORTANT (capture mode)
+    }, true); // ✅ capture mode (REQUIRED for Dawn)
 
   }
 
