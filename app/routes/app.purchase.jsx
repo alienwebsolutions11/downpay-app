@@ -256,10 +256,10 @@ export const action = async ({ request }) => {
             ],
 
         },
-        // resources: {
-        //   productIds: finalProductIds,
-        //     productVariantIds: variantIds,
-        // },
+        resources: {
+          productIds: finalProductIds,
+            productVariantIds: variantIds,
+        },
     };
 
     const response = await admin.graphql(CREATE_SELLING_PLAN, {
