@@ -77,15 +77,12 @@
     return checked ? checked.value : '';
   }
 
-  // Force hidden input (for normal themes)
-  function forceHiddenInput() {
+  // Simple hidden input (backup for simple themes)
+  function injectHiddenInput() {
     const form = getForm();
     if (!form) return;
-
     const spId = getSelectedSellingPlan();
-
     form.querySelectorAll('input[name="selling_plan"]').forEach(el => el.remove());
-
     if (spId) {
       const input = document.createElement('input');
       input.type = 'hidden';
@@ -95,9 +92,10 @@
     }
   }
 
-  // MAIN FIX: Intercept click and do direct AJAX when deposit is selected
-  function setupAggressiveInterceptor() {
+  // ==================== CORE FIX ====================
+  function setupInterceptor() {
     document.addEventListener('click', function (e) {
+      // Find Add to Cart button
       const btn = e.target.closest('button[name="add"], button[type="submit"], [type="submit"]');
       if (!btn) return;
 
@@ -106,23 +104,24 @@
 
       const sellingPlanId = getSelectedSellingPlan();
 
-      // If full payment → let the theme handle normally
-      if (!sellingPlanId) return;
+      // If "Pay full" is selected → let the original theme handle it
+      if (!sellingPlanId) {
+        injectHiddenInput();
+        return;
+      }
 
-      // Force hidden input anyway (in case theme uses it)
-      forceHiddenInput();
-
-      // Stop the theme from doing its own thing
+      // Deposit selected → BLOCK theme behavior and do direct AJAX
       e.preventDefault();
       e.stopImmediatePropagation();
 
+      injectHiddenInput(); // extra safety
+
       const variantId = form.querySelector('[name="id"]')?.value;
-      const qtyEl = form.querySelector('[name="quantity"]');
-      const quantity = qtyEl ? parseInt(qtyEl.value) || 1 : 1;
+      const qtyInput = form.querySelector('[name="quantity"]');
+      const quantity = qtyInput ? (parseInt(qtyInput.value) || 1) : 1;
 
       if (!variantId) return;
 
-      // Direct AJAX call with selling_plan — this bypasses most theme overrides
       fetch('/cart/add.js', {
         method: 'POST',
         headers: {
@@ -137,34 +136,33 @@
       })
       .then(response => response.json())
       .then(data => {
-        console.log('✅ Deposit added successfully with selling_plan:', sellingPlanId);
+        console.log('✅ Deposit added with selling_plan:', sellingPlanId);
 
-        // Trigger common cart drawer / refresh events so UI updates
+        // Trigger cart drawer / refresh on most themes
         document.dispatchEvent(new CustomEvent('cart:added', { detail: data }));
         document.dispatchEvent(new Event('cart:refresh'));
         document.dispatchEvent(new CustomEvent('product:added', { detail: data }));
       })
       .catch(err => {
-        console.error('Deposit add failed:', err);
-        // Last resort fallback
+        console.error('Add to cart failed:', err);
+        // Fallback
         form.submit();
       });
 
-    }, true); // capture: true = runs BEFORE theme listeners
+    }, true); // capture phase - runs before theme code
   }
 
-  function initSellingPlans() {
+  function initRadio() {
     const wrapper = document.querySelector('[data-selling-plan-wrapper]');
     if (wrapper) {
-      wrapper.addEventListener('change', forceHiddenInput);
+      wrapper.addEventListener('change', injectHiddenInput);
     }
-    setTimeout(forceHiddenInput, 300);
+    setTimeout(injectHiddenInput, 400);
   }
 
   function updateUI() {
     const form = getForm();
     if (!form) return;
-
     const variantId = form.querySelector('[name="id"]')?.value;
     if (!variantId) return;
 
@@ -189,12 +187,12 @@
     }
   }
 
-  function watchVariantChange() {
+  function watchVariant() {
     let lastId = null;
     setInterval(() => {
-      const currentId = getForm()?.querySelector('[name="id"]')?.value;
-      if (currentId && currentId !== lastId) {
-        lastId = currentId;
+      const id = getForm()?.querySelector('[name="id"]')?.value;
+      if (id && id !== lastId) {
+        lastId = id;
         updateUI();
       }
     }, 300);
@@ -202,14 +200,14 @@
 
   function init() {
     moveDepositBlock();
-    initSellingPlans();
-    setupAggressiveInterceptor();
+    initRadio();
+    setupInterceptor();
     updateUI();
-    watchVariantChange();
+    watchVariant();
 
-    // Extra safety
-    setTimeout(() => { moveDepositBlock(); forceHiddenInput(); }, 800);
-    setTimeout(() => { moveDepositBlock(); forceHiddenInput(); }, 1800);
+    // Extra retries for slow-loading themes
+    setTimeout(() => { moveDepositBlock(); injectHiddenInput(); }, 800);
+    setTimeout(() => { moveDepositBlock(); injectHiddenInput(); }, 1800);
   }
 
   document.addEventListener('DOMContentLoaded', init);
