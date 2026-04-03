@@ -12,158 +12,111 @@
 <fieldset data-selling-plan-wrapper>
   <legend>Deposit only due at checkout</legend>
 
-  {% assign first_plan = null %}
-  {% for sp_group in product.selling_plan_groups %}
-    {% for sp in sp_group.selling_plans %}
-      {% assign first_plan = sp %}
-      {% break %}
-    {% endfor %}
-    {% if first_plan %}{% break %}{% endif %}
-  {% endfor %}
-
+  {% assign first_plan = product.selling_plan_groups.first.selling_plans.first %}
   {% if first_plan %}
     <label class="options_purchase_radio_btn">
-      <input 
-        type="radio"
-        name="selling_plan_option"
-        value="{{ first_plan.id }}"
-        data-selling-plan
-      >
+      <input type="radio"
+             name="selling_plan_option"
+             value="{{ first_plan.id }}"
+             data-selling-plan>
       Deposit
     </label>
   {% endif %}
 
   <label class="options_purchase_radio_btn">
-    <input 
-      type="radio"
-      name="selling_plan_option"
-      value=""
-      data-selling-plan
-      checked
-    >
+    <input type="radio"
+           name="selling_plan_option"
+           value=""
+           data-selling-plan
+           checked>
     Pay full
   </label>
 </fieldset>
 
 <script>
-(function () {
+(function() {
+  const productData = {{ product | json }};
 
+  // Get product form dynamically
+  function getForm() {
+    return document.querySelector('form[action*="/cart/add"]');
+  }
+
+  // Get selected selling plan
   function getSelectedSellingPlan() {
-    const el = document.querySelector('[data-selling-plan]:checked');
-    return el ? el.value : '';
+    const checked = document.querySelector('[data-selling-plan]:checked');
+    return checked ? checked.value : '';
   }
 
-  /* -------------------------------
-     1️⃣ FORM SUBMIT (All themes)
-  --------------------------------*/
-  function handleFormSubmit(e) {
-    const form = e.target;
-
-    if (!form || !form.action.includes('/cart/add')) return;
-
-    let input = form.querySelector('[name="selling_plan"]');
-
-    if (!input) {
-      input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = 'selling_plan';
-      form.appendChild(input);
-    }
-
-    input.value = getSelectedSellingPlan();
-
-    console.log('✅ Form submit selling_plan:', input.value);
-  }
-
-  /* -------------------------------
-     2️⃣ PATCH FETCH (Dawn, OS 2.0)
-  --------------------------------*/
+  // Universal fetch patch to inject selling_plan
   function patchFetch() {
     const originalFetch = window.fetch;
-
-    window.fetch = async function (url, options) {
-
-      if (
-        typeof url === 'string' &&
-        url.includes('/cart/add') &&
-        options &&
-        options.body
-      ) {
+    window.fetch = async function(url, options) {
+      if (typeof url === 'string' && url.includes('/cart/add') && options) {
         try {
-          const sp = getSelectedSellingPlan();
-
           // JSON body
           if (options.headers?.['Content-Type']?.includes('application/json')) {
-            let body = JSON.parse(options.body);
-
+            const body = JSON.parse(options.body);
+            const sp = getSelectedSellingPlan();
             if (sp) body.selling_plan = sp;
-
             options.body = JSON.stringify(body);
-            console.log('✅ Fetch JSON selling_plan:', sp);
-          }
-
-          // FormData
+          } 
+          // FormData fallback
           else if (options.body instanceof FormData) {
+            const sp = getSelectedSellingPlan();
             if (sp) options.body.set('selling_plan', sp);
-            console.log('✅ Fetch FormData selling_plan:', sp);
           }
-
-        } catch (err) {
-          console.error('Fetch patch error', err);
-        }
+        } catch(e) { console.error('Selling plan patch error', e); }
       }
-
       return originalFetch.apply(this, arguments);
-    };
+    }
   }
 
-  /* -------------------------------
-     3️⃣ PATCH XHR (Some old themes/apps)
-  --------------------------------*/
-  function patchXHR() {
-    const origOpen = XMLHttpRequest.prototype.open;
+  // Update all visible prices dynamically
+  function updatePrices() {
+    const form = getForm();
+    if (!form) return;
 
-    XMLHttpRequest.prototype.open = function (method, url) {
-      this._url = url;
-      return origOpen.apply(this, arguments);
-    };
+    const variantId = form.querySelector('[name="id"]')?.value;
+    if (!variantId) return;
 
-    const origSend = XMLHttpRequest.prototype.send;
+    const variant = productData.variants.find(v => v.id == variantId);
+    if (!variant) return;
 
-    XMLHttpRequest.prototype.send = function (body) {
+    const depositInputs = document.querySelectorAll('[data-selling-plan-wrapper] [data-type="deposit"]');
+    const fullPriceInputs = document.querySelectorAll('[data-selling-plan-wrapper] [data-type="full"]');
 
-      if (this._url && this._url.includes('/cart/add')) {
-        try {
-          const sp = getSelectedSellingPlan();
+    depositInputs.forEach(el => {
+      const val = parseFloat(el.dataset.value || 50);
+      const amt = (variant.price * val / 100 / 100).toFixed(2);
+      el.textContent = `${val}% deposit ($${amt})`;
+    });
 
-          if (body instanceof FormData) {
-            if (sp) body.set('selling_plan', sp);
-            console.log('✅ XHR FormData selling_plan:', sp);
-          }
-        } catch (e) {
-          console.error('XHR patch error', e);
-        }
+    fullPriceInputs.forEach(el => {
+      el.textContent = '$' + (variant.price / 100).toFixed(2);
+    });
+  }
+
+  // Watch for variant changes dynamically
+  function watchVariantChange() {
+    let lastVariant;
+    setInterval(() => {
+      const variantId = getForm()?.querySelector('[name="id"]')?.value;
+      if (variantId && variantId !== lastVariant) {
+        lastVariant = variantId;
+        updatePrices();
       }
-
-      return origSend.apply(this, arguments);
-    };
+    }, 300);
   }
 
-  /* -------------------------------
-     INIT
-  --------------------------------*/
   function init() {
-    document.addEventListener('submit', handleFormSubmit, true);
-
     patchFetch();
-    patchXHR();
-
-    console.log('🔥 Selling plan universal script loaded');
+    updatePrices();
+    watchVariantChange();
   }
 
   document.addEventListener('DOMContentLoaded', init);
   document.addEventListener('shopify:section:load', init);
-
 })();
 </script>
 
