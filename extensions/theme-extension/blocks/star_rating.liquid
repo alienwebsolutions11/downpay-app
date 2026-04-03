@@ -60,6 +60,8 @@
 <script>
 (function () {
 
+  let currentSellingPlan = '';
+
   function getForm() {
     return document.querySelector('form[action*="/cart/add"]');
   }
@@ -76,53 +78,70 @@
     const wrapper = document.querySelector('[data-selling-plan-wrapper]');
     if (!wrapper) return;
 
-    wrapper.addEventListener('change', function () {
-      forceSellingPlanIntoForm();
-    });
-
-    // Default state
-    setTimeout(forceSellingPlanIntoForm, 400);
-  }
-
-  // Core function - this is the most important part
-  function forceSellingPlanIntoForm() {
-    const form = getForm();
-    if (!form) return;
-
-    const selected = document.querySelector('[data-selling-plan]:checked');
-    if (!selected) return;
-
-    // Remove any existing selling_plan input
-    form.querySelectorAll('input[name="selling_plan"]').forEach(el => el.remove());
-
-    if (selected.value) {
-      const input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = 'selling_plan';
-      input.value = selected.value;
-      form.appendChild(input);
-    }
-  }
-
-  // Handle both real submit and most AJAX themes
-  function handleAddToCart() {
-    const forms = document.querySelectorAll('form[action*="/cart/add"]');
-
-    forms.forEach(form => {
-      if (form.dataset.depositHandled) return;
-      form.dataset.depositHandled = 'true';
-
-      // 1. Real submit
-      form.addEventListener('submit', forceSellingPlanIntoForm);
-
-      // 2. Button click (most common in AJAX themes)
-      const btn = form.querySelector('button[name="add"], button[type="submit"], [type="submit"]');
-      if (btn) {
-        btn.addEventListener('click', () => {
-          setTimeout(forceSellingPlanIntoForm, 10);   // small delay helps
-        });
+    wrapper.addEventListener('change', function (e) {
+      if (e.target.matches('[data-selling-plan]')) {
+        currentSellingPlan = e.target.value;
       }
     });
+
+    // Set initial value
+    const checked = wrapper.querySelector('[data-selling-plan]:checked');
+    if (checked) currentSellingPlan = checked.value;
+  }
+
+  // ==================== MAIN FIX ====================
+  function interceptAddToCart() {
+    document.addEventListener('click', function (e) {
+      const btn = e.target.closest('button[name="add"], button[type="submit"], [type="submit"]');
+      if (!btn) return;
+
+      const form = btn.closest('form[action*="/cart/add"]');
+      if (!form) return;
+
+      // Get current selected selling plan
+      const selected = document.querySelector('[data-selling-plan]:checked');
+      const sellingPlanId = selected ? selected.value : '';
+
+      if (!sellingPlanId) return; // full payment - no need to do anything
+
+      // Prevent default theme behavior
+      e.preventDefault();
+      e.stopImmediatePropagation();
+
+      const variantId = form.querySelector('[name="id"]').value;
+      const quantity = form.querySelector('[name="quantity"]') ? parseInt(form.querySelector('[name="quantity"]').value) || 1 : 1;
+
+      // Manually call Shopify AJAX Cart API with selling_plan
+      fetch('/cart/add.js', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: variantId,
+          quantity: quantity,
+          selling_plan: sellingPlanId
+        })
+      })
+      .then(response => response.json())
+      .then(data => {
+        // Trigger theme's cart drawer / notification
+        if (typeof Shopify !== 'undefined' && Shopify.onItemAdded) {
+          Shopify.onItemAdded(data);
+        } else {
+          // Fallback: dispatch event that most themes listen to
+          document.dispatchEvent(new CustomEvent('cart:added', { detail: data }));
+          document.dispatchEvent(new Event('cart:refresh'));
+        }
+        // Optional: show success message
+        console.log('Added with deposit selling plan:', sellingPlanId);
+      })
+      .catch(err => {
+        console.error('Deposit add to cart error:', err);
+        // Fallback to normal behavior
+        form.submit();
+      });
+    }, true); // Use capture phase to run before theme's listeners
   }
 
   function updateUI() {
@@ -144,10 +163,9 @@
     if (depositEl) {
       const type = depositEl.dataset.type;
       const val = parseFloat(depositEl.dataset.value);
-
       if (type === 'percentage') {
-        const depositAmt = (price * val) / 100;
-        depositEl.textContent = `${val}% deposit ($${(depositAmt / 100).toFixed(2)})`;
+        const amt = (price * val) / 100;
+        depositEl.textContent = `${val}% deposit ($${(amt / 100).toFixed(2)})`;
       } else if (type === 'price') {
         depositEl.textContent = '$' + (val / 100).toFixed(2) + ' deposit';
       }
@@ -165,33 +183,20 @@
     }, 300);
   }
 
-  // Mutation observer for dynamic AJAX themes
-  function observeForms() {
-    new MutationObserver(() => {
-      handleAddToCart();
-    }).observe(document.body, { childList: true, subtree: true });
-  }
-
-  // Initialize everything
+  // Init
   function init() {
     moveDepositBlock();
     initSellingPlans();
-    handleAddToCart();
+    interceptAddToCart();
     updateUI();
     watchVariantChange();
-    observeForms();
 
-    // Extra safety for slow themes
-    setTimeout(() => { moveDepositBlock(); handleAddToCart(); forceSellingPlanIntoForm(); }, 800);
-    setTimeout(() => { moveDepositBlock(); handleAddToCart(); forceSellingPlanIntoForm(); }, 1500);
+    setTimeout(() => { moveDepositBlock(); }, 800);
+    setTimeout(() => { moveDepositBlock(); }, 1500);
   }
 
   document.addEventListener('DOMContentLoaded', init);
-  document.addEventListener('shopify:section:load', () => {
-    const block = document.querySelector('[data-selling-plan-wrapper]');
-    if (block) delete block.dataset.moved;
-    init();
-  });
+  document.addEventListener('shopify:section:load', init);
 
 })();
 </script>
@@ -200,7 +205,9 @@
 {
   "name": "Deposit Option",
   "target": "section",
-  "enabled_on": { "templates": ["product"] },
+  "enabled_on": {
+    "templates": ["product"]
+  },
   "settings": []
 }
 {% endschema %}
