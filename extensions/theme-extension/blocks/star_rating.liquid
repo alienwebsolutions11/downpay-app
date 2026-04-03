@@ -47,126 +47,145 @@
 
 <script>
 (function () {
-
-  function getSelectedSellingPlan() {
-    const el = document.querySelector('[data-selling-plan]:checked');
-    return el ? el.value : '';
+  // ✅ STEP 1: ADD HERE
+  let CURRENT_SELLING_PLAN = '';
+  function getForm() {
+    return document.querySelector('form[action*="/cart/add"]');
   }
 
-  /* ===============================
-     1️⃣ PATCH FETCH (Dawn, modern themes)
-  =============================== */
+function getSelectedSellingPlan() {
+  return CURRENT_SELLING_PLAN;
+}
+
+function watchSellingPlanSelection() {
+  document.addEventListener('change', function (e) {
+    if (e.target.matches('[data-selling-plan]')) {
+      CURRENT_SELLING_PLAN = e.target.value;
+      console.log('🧠 Stored selling plan:', CURRENT_SELLING_PLAN);
+    }
+  });
+}
+  // 🔥 CORE FIX: intercept Dawn fetch
+function patchFetch() {
   const originalFetch = window.fetch;
+
   window.fetch = async function (url, options) {
+
     if (
       typeof url === 'string' &&
-      url.includes('/cart/add') &&
+      (url.includes('/cart/add') || url.includes('/cart/add.js')) &&
       options &&
       options.body
     ) {
       try {
         const sp = getSelectedSellingPlan();
-
         if (!sp) return originalFetch.apply(this, arguments);
 
-        // JSON body
+        // ✅ JSON BODY
         if (options.headers?.['Content-Type']?.includes('application/json')) {
           let body = JSON.parse(options.body);
-          body.selling_plan = sp;
+
+          // 🔥 CASE 1: items array (Dawn, Refresh, etc.)
+          if (Array.isArray(body.items)) {
+            body.items = body.items.map(item => ({
+              ...item,
+              selling_plan: sp
+            }));
+            console.log('✅ Injected selling_plan into items[]:', sp);
+          }
+
+          // 🔥 CASE 2: direct object
+          else {
+            body.selling_plan = sp;
+            console.log('✅ Injected selling_plan (root):', sp);
+          }
+
           options.body = JSON.stringify(body);
-          console.log('✅ selling_plan added (fetch JSON)', sp);
         }
 
-        // FormData body
+        // ✅ FORM DATA
         else if (options.body instanceof FormData) {
           options.body.set('selling_plan', sp);
-          console.log('✅ selling_plan added (fetch FormData)', sp);
+          console.log('✅ Injected selling_plan (FormData):', sp);
         }
 
       } catch (e) {
-        console.error('Fetch patch error:', e);
+        console.error('Fetch patch error', e);
       }
     }
 
     return originalFetch.apply(this, arguments);
   };
-
-
-  /* ===============================
-     2️⃣ PATCH XHR (older/custom themes)
-  =============================== */
-  const originalOpen = XMLHttpRequest.prototype.open;
-  const originalSend = XMLHttpRequest.prototype.send;
-
-  XMLHttpRequest.prototype.open = function (method, url) {
-    this._url = url;
-    return originalOpen.apply(this, arguments);
-  };
-
-  XMLHttpRequest.prototype.send = function (body) {
-    try {
-      if (this._url && this._url.includes('/cart/add')) {
-        const sp = getSelectedSellingPlan();
-
-        if (sp && body instanceof FormData) {
-          body.set('selling_plan', sp);
-          console.log('✅ selling_plan added (XHR)', sp);
-        }
-      }
-    } catch (e) {
-      console.error('XHR patch error:', e);
-    }
-
-    return originalSend.apply(this, arguments);
-  };
-
-
-  /* ===============================
-     3️⃣ NORMAL FORM SUBMIT (fallback)
-  =============================== */
+}
+function patchFormSubmit() {
   document.addEventListener('submit', function (e) {
     const form = e.target;
 
-    if (!form || !form.action || !form.action.includes('/cart/add')) return;
+    if (form.action && form.action.includes('/cart/add')) {
+      const sp = getSelectedSellingPlan();
+      if (!sp) return;
 
-    const sp = getSelectedSellingPlan();
-    if (!sp) return;
+      let input = form.querySelector('[name="selling_plan"]');
 
-    let input = form.querySelector('[name="selling_plan"]');
-
-    if (!input) {
-      input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = 'selling_plan';
-      form.appendChild(input);
-    }
-
-    input.value = sp;
-
-    console.log('✅ selling_plan added (form submit)', sp);
-  });
-
-
-  /* ===============================
-     4️⃣ OPTIONAL: VARIANT CHANGE WATCH
-  =============================== */
-  function watchVariant() {
-    let last;
-
-    setInterval(() => {
-      const form = document.querySelector('form[action*="/cart/add"]');
-      const id = form?.querySelector('[name="id"]')?.value;
-
-      if (id && id !== last) {
-        last = id;
-        console.log('🔄 Variant changed:', id);
+      if (!input) {
+        input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'selling_plan';
+        form.appendChild(input);
       }
-    }, 400);
+
+      input.value = sp;
+
+      console.log('✅ Injected selling_plan via form submit:', sp);
+    }
+  });
+}
+  // UI sync (optional but good)
+  function updateUI() {
+    const form = getForm();
+    if (!form) return;
+
+    const variantId = form.querySelector('[name="id"]')?.value;
+    if (!variantId) return;
+
+    const variant = window.productData?.variants?.find(v => v.id == variantId);
+    if (!variant) return;
+
+    const price = variant.price;
+
+    const full = document.getElementById('full-price');
+    if (full) full.textContent = '$' + (price / 100).toFixed(2);
+
+    const dep = document.getElementById('deposit-text');
+    if (dep) {
+      const type = dep.dataset.type;
+      const val = parseFloat(dep.dataset.value);
+
+      if (type === 'percentage') {
+        const amt = (price * val) / 100;
+        dep.textContent = `${val}% deposit ($${(amt / 100).toFixed(2)})`;
+      } else {
+        dep.textContent = '$' + (val / 100).toFixed(2) + ' deposit';
+      }
+    }
   }
 
+  function watchVariant() {
+    let last;
+    setInterval(() => {
+      const id = getForm()?.querySelector('[name="id"]')?.value;
+      if (id && id !== last) {
+        last = id;
+        updateUI();
+      }
+    }, 300);
+  }
 
   function init() {
-    watchVariant();
+   patchFetch();        // AJAX themes
+  patchFormSubmit();   // non-AJAX themes
+  updateUI();
+  watchVariant();
   }
 
   document.addEventListener('DOMContentLoaded', init);
@@ -174,6 +193,7 @@
 
 })();
 </script>
+
 {% schema %}
 {
   "name": "Deposit Option",
