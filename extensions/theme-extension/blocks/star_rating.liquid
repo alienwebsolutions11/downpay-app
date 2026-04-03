@@ -47,16 +47,45 @@
 
 <script>
 (function () {
-
+  // ✅ STEP 1: ADD HERE
+  let CURRENT_SELLING_PLAN = '';
   function getForm() {
     return document.querySelector('form[action*="/cart/add"]');
   }
 
-  function getSelectedSellingPlan() {
-    const el = document.querySelector('[data-selling-plan]:checked');
-    return el ? el.value : '';
-  }
+function getSelectedSellingPlan() {
+  return CURRENT_SELLING_PLAN;
+}
+function watchSellingPlanSelection() {
+  document.addEventListener('change', function (e) {
+    if (e.target.matches('[data-selling-plan]')) {
+      CURRENT_SELLING_PLAN = e.target.value;
+      console.log('🧠 Stored selling plan:', CURRENT_SELLING_PLAN);
+    }
+  });
+}
+function restoreSelection() {
+  if (!CURRENT_SELLING_PLAN) return;
 
+  const el = document.querySelector(
+    `[data-selling-plan][value="${CURRENT_SELLING_PLAN}"]`
+  );
+
+  if (el) {
+    el.checked = true;
+    console.log('♻️ Restored selling plan');
+  }
+}
+function observeDOM() {
+  const observer = new MutationObserver(() => {
+    restoreSelection();
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+}
   // 🔥 CORE FIX: intercept Dawn fetch
 function patchFetch() {
   const originalFetch = window.fetch;
@@ -173,12 +202,22 @@ function patchFormSubmit() {
     }, 300);
   }
 
-  function init() {
-   patchFetch();        // AJAX themes
-  patchFormSubmit();   // non-AJAX themes
+ function init() {
+  patchFetch();
+  patchFormSubmit();
+
+  watchSellingPlanSelection(); // ✅ NEW
+  observeDOM();                // ✅ NEW
+
   updateUI();
   watchVariant();
+
+  // ✅ set default on load
+  const checked = document.querySelector('[data-selling-plan]:checked');
+  if (checked) {
+    CURRENT_SELLING_PLAN = checked.value;
   }
+}
 
   document.addEventListener('DOMContentLoaded', init);
   document.addEventListener('shopify:section:load', init);
