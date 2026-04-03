@@ -72,16 +72,16 @@
     block.dataset.moved = "true";
   }
 
-  function getSelectedSellingPlan() {
-    const checked = document.querySelector('[data-selling-plan]:checked');
-    return checked ? checked.value : '';
-  }
+function getSelectedSellingPlan(form) {
+  const checked = form.querySelector('[data-selling-plan]:checked');
+  return checked ? checked.value : '';
+}
 
   function injectHiddenInput() {
     const form = getForm();
     if (!form) return;
 
-    const spId = getSelectedSellingPlan();
+    const spId = getSelectedSellingPlan(form);
     form.querySelectorAll('input[name="selling_plan"]').forEach(el => el.remove());
 
     if (spId) {
@@ -94,27 +94,32 @@
   }
 
   // Dawn-specific + general interceptor
-  function setupInterceptor() {
-    document.addEventListener('click', function (e) {
-      const btn = e.target.closest('button[name="add"], button[type="submit"], [type="submit"]');
-      if (!btn) return;
+function setupInterceptor() {
+  document.addEventListener('click', function (e) {
+    const btn = e.target.closest('button[name="add"], button[type="submit"], [type="submit"]');
+    if (!btn) return;
 
-      const form = btn.closest('form[action*="/cart/add"]');
-      if (!form) return;
+    const form = btn.closest('form[action*="/cart/add"]');
+    if (!form) return;
 
-      const sellingPlanId = getSelectedSellingPlan();
+    const sellingPlanId = getSelectedSellingPlan(form);
 
-      // Full payment → let Dawn/theme handle normally
-      if (!sellingPlanId) {
-        injectHiddenInput();
-        return;
-      }
+    // Always clean old input
+    form.querySelectorAll('input[name="selling_plan"]').forEach(el => el.remove());
 
-      // Deposit selected → take full control
+    if (sellingPlanId) {
+      // Add hidden input (fallback for non-AJAX themes)
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'selling_plan';
+      input.value = sellingPlanId;
+      form.appendChild(input);
+    }
+
+    // 🚨 IMPORTANT: handle Dawn AJAX manually
+    if (sellingPlanId) {
       e.preventDefault();
       e.stopImmediatePropagation();
-
-      injectHiddenInput();
 
       const variantId = form.querySelector('[name="id"]')?.value;
       const qtyInput = form.querySelector('[name="quantity"]');
@@ -134,26 +139,28 @@
           selling_plan: sellingPlanId
         })
       })
-      .then(r => r.json())
+      .then(res => res.json())
       .then(data => {
-        console.log('✅ Deposit added with selling_plan:', sellingPlanId);
+        console.log('✅ Added with selling_plan:', sellingPlanId);
 
-        // Trigger Dawn cart drawer / refresh
+        // Dawn cart refresh triggers
         document.dispatchEvent(new CustomEvent('cart:added', { detail: data }));
         document.dispatchEvent(new Event('cart:refresh'));
-        document.dispatchEvent(new CustomEvent('product:added', { detail: data }));
       })
       .catch(err => {
         console.error(err);
         form.submit(); // fallback
       });
+    }
 
-    }, true); // capture phase (important for Dawn)
-  }
-
+  }, true); // capture phase VERY IMPORTANT
+}
   function initRadio() {
     const wrapper = document.querySelector('[data-selling-plan-wrapper]');
-    if (wrapper) wrapper.addEventListener('change', injectHiddenInput);
+    if (wrapper) wrapper.addEventListener('change', function () {
+  const form = getForm();
+  if (form) injectHiddenInput(form);
+});
     setTimeout(injectHiddenInput, 300);
   }
 
