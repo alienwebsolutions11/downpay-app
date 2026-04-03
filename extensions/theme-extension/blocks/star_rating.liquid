@@ -58,51 +58,80 @@
   }
 
   // 🔥 CORE FIX: intercept Dawn fetch
-  function patchFetch() {
-    const originalFetch = window.fetch;
+function patchFetch() {
+  const originalFetch = window.fetch;
 
-    window.fetch = async function (url, options) {
+  window.fetch = async function (url, options) {
 
-      if (
-        typeof url === 'string' &&
-        url.includes('/cart/add') &&
-        options &&
-        options.body
-      ) {
-        try {
-          let body;
+    if (
+      typeof url === 'string' &&
+      (url.includes('/cart/add') || url.includes('/cart/add.js')) &&
+      options &&
+      options.body
+    ) {
+      try {
+        const sp = getSelectedSellingPlan();
+        if (!sp) return originalFetch.apply(this, arguments);
 
-          // handle JSON body (Dawn default)
-          if (options.headers?.['Content-Type']?.includes('application/json')) {
-            body = JSON.parse(options.body);
+        // ✅ JSON BODY
+        if (options.headers?.['Content-Type']?.includes('application/json')) {
+          let body = JSON.parse(options.body);
 
-            const sp = getSelectedSellingPlan();
-            if (sp) {
-              body.selling_plan = sp;
-              console.log('✅ Injected selling_plan (JSON):', sp);
-            }
-
-            options.body = JSON.stringify(body);
+          // 🔥 CASE 1: items array (Dawn, Refresh, etc.)
+          if (Array.isArray(body.items)) {
+            body.items = body.items.map(item => ({
+              ...item,
+              selling_plan: sp
+            }));
+            console.log('✅ Injected selling_plan into items[]:', sp);
           }
 
-          // handle FormData (fallback themes)
-          else if (options.body instanceof FormData) {
-            const sp = getSelectedSellingPlan();
-            if (sp) {
-              options.body.set('selling_plan', sp);
-              console.log('✅ Injected selling_plan (FormData):', sp);
-            }
+          // 🔥 CASE 2: direct object
+          else {
+            body.selling_plan = sp;
+            console.log('✅ Injected selling_plan (root):', sp);
           }
 
-        } catch (e) {
-          console.error('Fetch patch error', e);
+          options.body = JSON.stringify(body);
         }
+
+        // ✅ FORM DATA
+        else if (options.body instanceof FormData) {
+          options.body.set('selling_plan', sp);
+          console.log('✅ Injected selling_plan (FormData):', sp);
+        }
+
+      } catch (e) {
+        console.error('Fetch patch error', e);
+      }
+    }
+
+    return originalFetch.apply(this, arguments);
+  };
+}
+function patchFormSubmit() {
+  document.addEventListener('submit', function (e) {
+    const form = e.target;
+
+    if (form.action && form.action.includes('/cart/add')) {
+      const sp = getSelectedSellingPlan();
+      if (!sp) return;
+
+      let input = form.querySelector('[name="selling_plan"]');
+
+      if (!input) {
+        input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'selling_plan';
+        form.appendChild(input);
       }
 
-      return originalFetch.apply(this, arguments);
-    };
-  }
+      input.value = sp;
 
+      console.log('✅ Injected selling_plan via form submit:', sp);
+    }
+  });
+}
   // UI sync (optional but good)
   function updateUI() {
     const form = getForm();
@@ -145,9 +174,10 @@
   }
 
   function init() {
-    patchFetch();   // 🔥 IMPORTANT
-    updateUI();
-    watchVariant();
+   patchFetch();        // AJAX themes
+  patchFormSubmit();   // non-AJAX themes
+  updateUI();
+  watchVariant();
   }
 
   document.addEventListener('DOMContentLoaded', init);
