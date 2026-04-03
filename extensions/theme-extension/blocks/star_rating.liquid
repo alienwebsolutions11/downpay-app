@@ -48,16 +48,36 @@
 <script>
 (function () {
 
-  function getForm() {
-    return document.querySelector('form[action*="/cart/add"]');
-  }
-
   function getSelectedSellingPlan() {
     const el = document.querySelector('[data-selling-plan]:checked');
     return el ? el.value : '';
   }
 
-  // 🔥 CORE FIX: intercept Dawn fetch
+  /* -------------------------------
+     1️⃣ FORM SUBMIT (All themes)
+  --------------------------------*/
+  function handleFormSubmit(e) {
+    const form = e.target;
+
+    if (!form || !form.action.includes('/cart/add')) return;
+
+    let input = form.querySelector('[name="selling_plan"]');
+
+    if (!input) {
+      input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'selling_plan';
+      form.appendChild(input);
+    }
+
+    input.value = getSelectedSellingPlan();
+
+    console.log('✅ Form submit selling_plan:', input.value);
+  }
+
+  /* -------------------------------
+     2️⃣ PATCH FETCH (Dawn, OS 2.0)
+  --------------------------------*/
   function patchFetch() {
     const originalFetch = window.fetch;
 
@@ -70,32 +90,26 @@
         options.body
       ) {
         try {
-          let body;
+          const sp = getSelectedSellingPlan();
 
-          // handle JSON body (Dawn default)
+          // JSON body
           if (options.headers?.['Content-Type']?.includes('application/json')) {
-            body = JSON.parse(options.body);
+            let body = JSON.parse(options.body);
 
-            const sp = getSelectedSellingPlan();
-            if (sp) {
-              body.selling_plan = sp;
-              console.log('✅ Injected selling_plan (JSON):', sp);
-            }
+            if (sp) body.selling_plan = sp;
 
             options.body = JSON.stringify(body);
+            console.log('✅ Fetch JSON selling_plan:', sp);
           }
 
-          // handle FormData (fallback themes)
+          // FormData
           else if (options.body instanceof FormData) {
-            const sp = getSelectedSellingPlan();
-            if (sp) {
-              options.body.set('selling_plan', sp);
-              console.log('✅ Injected selling_plan (FormData):', sp);
-            }
+            if (sp) options.body.set('selling_plan', sp);
+            console.log('✅ Fetch FormData selling_plan:', sp);
           }
 
-        } catch (e) {
-          console.error('Fetch patch error', e);
+        } catch (err) {
+          console.error('Fetch patch error', err);
         }
       }
 
@@ -103,51 +117,48 @@
     };
   }
 
-  // UI sync (optional but good)
-  function updateUI() {
-    const form = getForm();
-    if (!form) return;
+  /* -------------------------------
+     3️⃣ PATCH XHR (Some old themes/apps)
+  --------------------------------*/
+  function patchXHR() {
+    const origOpen = XMLHttpRequest.prototype.open;
 
-    const variantId = form.querySelector('[name="id"]')?.value;
-    if (!variantId) return;
+    XMLHttpRequest.prototype.open = function (method, url) {
+      this._url = url;
+      return origOpen.apply(this, arguments);
+    };
 
-    const variant = window.productData?.variants?.find(v => v.id == variantId);
-    if (!variant) return;
+    const origSend = XMLHttpRequest.prototype.send;
 
-    const price = variant.price;
+    XMLHttpRequest.prototype.send = function (body) {
 
-    const full = document.getElementById('full-price');
-    if (full) full.textContent = '$' + (price / 100).toFixed(2);
+      if (this._url && this._url.includes('/cart/add')) {
+        try {
+          const sp = getSelectedSellingPlan();
 
-    const dep = document.getElementById('deposit-text');
-    if (dep) {
-      const type = dep.dataset.type;
-      const val = parseFloat(dep.dataset.value);
-
-      if (type === 'percentage') {
-        const amt = (price * val) / 100;
-        dep.textContent = `${val}% deposit ($${(amt / 100).toFixed(2)})`;
-      } else {
-        dep.textContent = '$' + (val / 100).toFixed(2) + ' deposit';
+          if (body instanceof FormData) {
+            if (sp) body.set('selling_plan', sp);
+            console.log('✅ XHR FormData selling_plan:', sp);
+          }
+        } catch (e) {
+          console.error('XHR patch error', e);
+        }
       }
-    }
+
+      return origSend.apply(this, arguments);
+    };
   }
 
-  function watchVariant() {
-    let last;
-    setInterval(() => {
-      const id = getForm()?.querySelector('[name="id"]')?.value;
-      if (id && id !== last) {
-        last = id;
-        updateUI();
-      }
-    }, 300);
-  }
-
+  /* -------------------------------
+     INIT
+  --------------------------------*/
   function init() {
-    patchFetch();   // 🔥 IMPORTANT
-    updateUI();
-    watchVariant();
+    document.addEventListener('submit', handleFormSubmit, true);
+
+    patchFetch();
+    patchXHR();
+
+    console.log('🔥 Selling plan universal script loaded');
   }
 
   document.addEventListener('DOMContentLoaded', init);
