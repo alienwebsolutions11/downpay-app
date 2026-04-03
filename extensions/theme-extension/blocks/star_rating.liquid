@@ -77,7 +77,7 @@
 (function () {
   console.log("productData:", window.productData); // ✅ ADD HERE
 function getForm() {
-  return document.querySelector('form[action*="/cart/add"], form[data-product-form]');
+  return document.querySelector('form[action*="/cart/add"], form[data-product-form], product-form form');
 }
 
 // ✅ Move block above Add to Cart
@@ -207,16 +207,22 @@ function watchVariantChange() {
 }
 
 // 🚀 INIT
-document.addEventListener('DOMContentLoaded', function(){
+function waitForProduct() {
+  if (!window.productData || !window.productData.variants) {
+    setTimeout(waitForProduct, 100);
+    return;
+  }
+
+  console.log("🔥 Product ready:", window.productData);
+
   moveDepositBlock();
   initSellingPlans();
   handleFormSubmit();
   updateUI();
   watchVariantChange();
+}
 
-  setTimeout(moveDepositBlock, 500);
-  setTimeout(moveDepositBlock, 1000);
-});
+document.addEventListener('DOMContentLoaded', waitForProduct);
 
 document.addEventListener('shopify:section:load', function(){
   moveDepositBlock();
