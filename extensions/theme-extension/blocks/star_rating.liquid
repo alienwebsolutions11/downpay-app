@@ -62,7 +62,17 @@
 
 function getActiveForm() {
   // 🔥 get form from Add to Cart button
-  const btn = document.querySelector('[name="add"], button[type="submit"]');
+function getActiveForm() {
+  const forms = document.querySelectorAll('form[action*="/cart/add"]');
+
+  for (const form of forms) {
+    if (form.offsetParent !== null) { // visible form only
+      return form;
+    }
+  }
+
+  return forms[0] || null;
+}
   if (btn) return btn.closest('form');
 
   // fallback
@@ -77,21 +87,28 @@ function moveDepositBlock() {
   if (!block || !form) return;
 
   if (!block.dataset.moved) {
-    form.insertBefore(block, form.firstChild);
+    const productInput = form.querySelector('[name="id"]');
+
+if (productInput) {
+  const actualForm = productInput.closest('form');
+
+  if (actualForm && !block.dataset.moved) {
+    actualForm.prepend(block);
+    block.dataset.moved = "true";
+  }
+}
     block.dataset.moved = "true";
   }
 }
 
 // ✅ Always inject selling plan at submit time
 function handleFormSubmit() {
-  document.addEventListener('submit', function (e) {
+  const form = getActiveForm();
+  if (!form) return;
 
-    const form = e.target;
+  form.addEventListener('submit', function () {
 
-    // only product forms
-    if (!form.querySelector('[name="id"]')) return;
-
-    const selected = document.querySelector('[data-selling-plan]:checked');
+    const selected = form.querySelector('[data-selling-plan]:checked');
 
     // remove old
     form.querySelector('input[name="selling_plan"]')?.remove();
