@@ -48,180 +48,125 @@
 <script>
 (function () {
 
-  let initialized = false;
-
   function getSelectedSellingPlan() {
     const el = document.querySelector('[data-selling-plan]:checked');
     return el ? el.value : '';
   }
 
-  /* --------------------------
-     1️⃣ FETCH PATCH (AJAX)
-  -------------------------- */
-  function patchFetch() {
-    if (window.__sp_fetch_patched) return;
-    window.__sp_fetch_patched = true;
-
-    const originalFetch = window.fetch;
-
-    window.fetch = async function (url, options) {
-      if (
-        typeof url === 'string' &&
-        (url.includes('/cart/add') || url.includes('/cart/add.js')) &&
-        options?.body
-      ) {
-        try {
-          const sp = getSelectedSellingPlan();
-          if (!sp) return originalFetch.apply(this, arguments);
-
-          if (options.headers?.['Content-Type']?.includes('application/json')) {
-            let body = JSON.parse(options.body);
-
-            if (Array.isArray(body.items)) {
-              body.items = body.items.map(item => ({
-                ...item,
-                selling_plan: sp
-              }));
-            } else {
-              body.selling_plan = sp;
-            }
-
-            options.body = JSON.stringify(body);
-          }
-
-          else if (options.body instanceof FormData) {
-            options.body.set('selling_plan', sp);
-          }
-
-        } catch (e) {
-          console.error('Fetch patch error', e);
-        }
-      }
-
-      return originalFetch.apply(this, arguments);
-    };
-  }
-
-  /* --------------------------
-     2️⃣ XHR PATCH (OLD THEMES)
-  -------------------------- */
-  function patchXHR() {
-    if (window.__sp_xhr_patched) return;
-    window.__sp_xhr_patched = true;
-
-    const origOpen = XMLHttpRequest.prototype.open;
-    const origSend = XMLHttpRequest.prototype.send;
-
-    XMLHttpRequest.prototype.open = function (method, url) {
-      this._url = url;
-      return origOpen.apply(this, arguments);
-    };
-
-    XMLHttpRequest.prototype.send = function (body) {
-
-      if (this._url && this._url.includes('/cart/add')) {
-        try {
-          const sp = getSelectedSellingPlan();
-          if (!sp) return origSend.apply(this, arguments);
-
-          // JSON
-          if (typeof body === 'string' && body.includes('{')) {
-            let data = JSON.parse(body);
-
-            if (Array.isArray(data.items)) {
-              data.items = data.items.map(item => ({
-                ...item,
-                selling_plan: sp
-              }));
-            } else {
-              data.selling_plan = sp;
-            }
-
-            body = JSON.stringify(data);
-          }
-
-          // FormData
-          else if (body instanceof FormData) {
-            body.set('selling_plan', sp);
-          }
-
-        } catch (e) {
-          console.error('XHR patch error', e);
-        }
-      }
-
-      return origSend.call(this, body);
-    };
-  }
-
-  /* --------------------------
-     3️⃣ FORM SUBMIT (NON AJAX)
-  -------------------------- */
-  function patchFormSubmit() {
-    document.addEventListener('submit', function (e) {
-      const form = e.target;
-
-      if (form.action && form.action.includes('/cart/add')) {
+  /* ===============================
+     1️⃣ PATCH FETCH (Dawn, modern themes)
+  =============================== */
+  const originalFetch = window.fetch;
+  window.fetch = async function (url, options) {
+    if (
+      typeof url === 'string' &&
+      url.includes('/cart/add') &&
+      options &&
+      options.body
+    ) {
+      try {
         const sp = getSelectedSellingPlan();
-        if (!sp) return;
 
-        let input = form.querySelector('[name="selling_plan"]');
+        if (!sp) return originalFetch.apply(this, arguments);
 
-        if (!input) {
-          input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = 'selling_plan';
-          form.appendChild(input);
+        // JSON body
+        if (options.headers?.['Content-Type']?.includes('application/json')) {
+          let body = JSON.parse(options.body);
+          body.selling_plan = sp;
+          options.body = JSON.stringify(body);
+          console.log('✅ selling_plan added (fetch JSON)', sp);
         }
 
-        input.value = sp;
+        // FormData body
+        else if (options.body instanceof FormData) {
+          options.body.set('selling_plan', sp);
+          console.log('✅ selling_plan added (fetch FormData)', sp);
+        }
+
+      } catch (e) {
+        console.error('Fetch patch error:', e);
       }
-    });
-  }
+    }
 
-  /* --------------------------
-     4️⃣ RE-INIT ON EVERY LOAD
-  -------------------------- */
-  function observeDOM() {
-    const observer = new MutationObserver(() => {
-      attachEvents();
-    });
+    return originalFetch.apply(this, arguments);
+  };
 
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-  }
 
-  function attachEvents() {
-    // Force radios to persist (important for Dawn)
-    const radios = document.querySelectorAll('[data-selling-plan]');
-    radios.forEach(radio => {
-      radio.addEventListener('change', () => {
-        window.__selected_sp = radio.value;
-      });
+  /* ===============================
+     2️⃣ PATCH XHR (older/custom themes)
+  =============================== */
+  const originalOpen = XMLHttpRequest.prototype.open;
+  const originalSend = XMLHttpRequest.prototype.send;
 
-      // restore selection
-      if (window.__selected_sp && radio.value == window.__selected_sp) {
-        radio.checked = true;
+  XMLHttpRequest.prototype.open = function (method, url) {
+    this._url = url;
+    return originalOpen.apply(this, arguments);
+  };
+
+  XMLHttpRequest.prototype.send = function (body) {
+    try {
+      if (this._url && this._url.includes('/cart/add')) {
+        const sp = getSelectedSellingPlan();
+
+        if (sp && body instanceof FormData) {
+          body.set('selling_plan', sp);
+          console.log('✅ selling_plan added (XHR)', sp);
+        }
       }
-    });
+    } catch (e) {
+      console.error('XHR patch error:', e);
+    }
+
+    return originalSend.apply(this, arguments);
+  };
+
+
+  /* ===============================
+     3️⃣ NORMAL FORM SUBMIT (fallback)
+  =============================== */
+  document.addEventListener('submit', function (e) {
+    const form = e.target;
+
+    if (!form || !form.action || !form.action.includes('/cart/add')) return;
+
+    const sp = getSelectedSellingPlan();
+    if (!sp) return;
+
+    let input = form.querySelector('[name="selling_plan"]');
+
+    if (!input) {
+      input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'selling_plan';
+      form.appendChild(input);
+    }
+
+    input.value = sp;
+
+    console.log('✅ selling_plan added (form submit)', sp);
+  });
+
+
+  /* ===============================
+     4️⃣ OPTIONAL: VARIANT CHANGE WATCH
+  =============================== */
+  function watchVariant() {
+    let last;
+
+    setInterval(() => {
+      const form = document.querySelector('form[action*="/cart/add"]');
+      const id = form?.querySelector('[name="id"]')?.value;
+
+      if (id && id !== last) {
+        last = id;
+        console.log('🔄 Variant changed:', id);
+      }
+    }, 400);
   }
 
-  /* --------------------------
-     INIT
-  -------------------------- */
+
   function init() {
-    if (initialized) return;
-    initialized = true;
-
-    patchFetch();
-    patchXHR();
-    patchFormSubmit();
-    observeDOM();
-    attachEvents();
-
-    console.log('✅ Selling Plan Universal Patch Loaded');
+    watchVariant();
   }
 
   document.addEventListener('DOMContentLoaded', init);
