@@ -37,22 +37,23 @@
 (function() {
   const productData = {{ product | json }};
 
-  // Get product form dynamically
+  // 🔹 Get the product form dynamically
   function getForm() {
     return document.querySelector('form[action*="/cart/add"]');
   }
 
-  // Get selected selling plan
+  // 🔹 Get selected selling plan
   function getSelectedSellingPlan() {
     const checked = document.querySelector('[data-selling-plan]:checked');
     return checked ? checked.value : '';
   }
 
-  // Universal fetch patch to inject selling_plan
-  function patchFetch() {
+  // 🔹 Patch fetch and XMLHttpRequest to inject selling_plan
+  function patchCartRequests() {
+    // Fetch patch
     const originalFetch = window.fetch;
     window.fetch = async function(url, options) {
-      if (typeof url === 'string' && url.includes('/cart/add') && options) {
+      if (url.includes('/cart/add') && options) {
         try {
           // JSON body
           if (options.headers?.['Content-Type']?.includes('application/json')) {
@@ -60,44 +61,67 @@
             const sp = getSelectedSellingPlan();
             if (sp) body.selling_plan = sp;
             options.body = JSON.stringify(body);
-          } 
+          }
           // FormData fallback
           else if (options.body instanceof FormData) {
             const sp = getSelectedSellingPlan();
             if (sp) options.body.set('selling_plan', sp);
           }
-        } catch(e) { console.error('Selling plan patch error', e); }
+        } catch(e) { console.error('Selling plan injection error', e); }
       }
       return originalFetch.apply(this, arguments);
+    };
+
+    // XHR patch (for older themes using XMLHttpRequest)
+    const originalXHR = window.XMLHttpRequest;
+    function CustomXHR() {
+      const xhr = new originalXHR();
+      const originalOpen = xhr.open;
+      xhr.open = function(method, url, async) {
+        this._url = url;
+        return originalOpen.apply(this, arguments);
+      };
+      const originalSend = xhr.send;
+      xhr.send = function(body) {
+        if (this._url.includes('/cart/add')) {
+          try {
+            if (body instanceof FormData) {
+              const sp = getSelectedSellingPlan();
+              if (sp) body.set('selling_plan', sp);
+            }
+          } catch(e) { console.error(e); }
+        }
+        return originalSend.apply(this, arguments);
+      };
+      return xhr;
     }
+    window.XMLHttpRequest = CustomXHR;
   }
 
-  // Update all visible prices dynamically
+  // 🔹 Update price display (optional)
   function updatePrices() {
     const form = getForm();
     if (!form) return;
-
     const variantId = form.querySelector('[name="id"]')?.value;
     if (!variantId) return;
-
     const variant = productData.variants.find(v => v.id == variantId);
     if (!variant) return;
 
-    const depositInputs = document.querySelectorAll('[data-selling-plan-wrapper] [data-type="deposit"]');
-    const fullPriceInputs = document.querySelectorAll('[data-selling-plan-wrapper] [data-type="full"]');
-
-    depositInputs.forEach(el => {
-      const val = parseFloat(el.dataset.value || 50);
-      const amt = (variant.price * val / 100 / 100).toFixed(2);
-      el.textContent = `${val}% deposit ($${amt})`;
-    });
-
-    fullPriceInputs.forEach(el => {
-      el.textContent = '$' + (variant.price / 100).toFixed(2);
+    document.querySelectorAll('[data-selling-plan-wrapper]').forEach(wrapper => {
+      // Update deposit display
+      wrapper.querySelectorAll('[data-type="deposit"]').forEach(el => {
+        const percent = parseFloat(el.dataset.value || 50);
+        const amt = ((variant.price * percent) / 100 / 100).toFixed(2);
+        el.textContent = `${percent}% deposit ($${amt})`;
+      });
+      // Update full price display
+      wrapper.querySelectorAll('[data-type="full"]').forEach(el => {
+        el.textContent = '$' + (variant.price / 100).toFixed(2);
+      });
     });
   }
 
-  // Watch for variant changes dynamically
+  // 🔹 Watch for variant changes
   function watchVariantChange() {
     let lastVariant;
     setInterval(() => {
@@ -109,8 +133,9 @@
     }, 300);
   }
 
+  // 🔹 Init
   function init() {
-    patchFetch();
+    patchCartRequests();
     updatePrices();
     watchVariantChange();
   }
