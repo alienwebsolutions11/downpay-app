@@ -48,75 +48,106 @@
 <script>
 (function () {
 
+  function getForm() {
+    return document.querySelector('form[action*="/cart/add"]');
+  }
+
+  function getSelectedSellingPlan() {
+    const el = document.querySelector('[data-selling-plan]:checked');
+    return el ? el.value : '';
+  }
+
+  // 🔥 CORE FIX: intercept Dawn fetch
+  function patchFetch() {
+    const originalFetch = window.fetch;
+
+    window.fetch = async function (url, options) {
+
+      if (
+        typeof url === 'string' &&
+        url.includes('/cart/add') &&
+        options &&
+        options.body
+      ) {
+        try {
+          let body;
+
+          // handle JSON body (Dawn default)
+          if (options.headers?.['Content-Type']?.includes('application/json')) {
+            body = JSON.parse(options.body);
+
+            const sp = getSelectedSellingPlan();
+            if (sp) {
+              body.selling_plan = sp;
+              console.log('✅ Injected selling_plan (JSON):', sp);
+            }
+
+            options.body = JSON.stringify(body);
+          }
+
+          // handle FormData (fallback themes)
+          else if (options.body instanceof FormData) {
+            const sp = getSelectedSellingPlan();
+            if (sp) {
+              options.body.set('selling_plan', sp);
+              console.log('✅ Injected selling_plan (FormData):', sp);
+            }
+          }
+
+        } catch (e) {
+          console.error('Fetch patch error', e);
+        }
+      }
+
+      return originalFetch.apply(this, arguments);
+    };
+  }
+
+  // UI sync (optional but good)
+  function updateUI() {
+    const form = getForm();
+    if (!form) return;
+
+    const variantId = form.querySelector('[name="id"]')?.value;
+    if (!variantId) return;
+
+    const variant = window.productData?.variants?.find(v => v.id == variantId);
+    if (!variant) return;
+
+    const price = variant.price;
+
+    const full = document.getElementById('full-price');
+    if (full) full.textContent = '$' + (price / 100).toFixed(2);
+
+    const dep = document.getElementById('deposit-text');
+    if (dep) {
+      const type = dep.dataset.type;
+      const val = parseFloat(dep.dataset.value);
+
+      if (type === 'percentage') {
+        const amt = (price * val) / 100;
+        dep.textContent = `${val}% deposit ($${(amt / 100).toFixed(2)})`;
+      } else {
+        dep.textContent = '$' + (val / 100).toFixed(2) + ' deposit';
+      }
+    }
+  }
+
+  function watchVariant() {
+    let last;
+    setInterval(() => {
+      const id = getForm()?.querySelector('[name="id"]')?.value;
+      if (id && id !== last) {
+        last = id;
+        updateUI();
+      }
+    }, 300);
+  }
+
   function init() {
-
-    document.addEventListener('click', function (e) {
-
-      const btn = e.target.closest('button[name="add"], button[type="submit"]');
-      if (!btn) return;
-
-      const form = btn.closest('form[action*="/cart/add"]');
-      if (!form) return;
-
-      const checked = form.querySelector('[data-selling-plan]:checked');
-      const sellingPlanId = checked ? checked.value : '';
-
-      console.log("👉 selling_plan:", sellingPlanId);
-
-      // always remove old
-      form.querySelectorAll('input[name="selling_plan"]').forEach(el => el.remove());
-
-      if (sellingPlanId) {
-        // hidden input (fallback)
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'selling_plan';
-        input.value = sellingPlanId;
-        form.appendChild(input);
-      }
-
-      // 👉 NO deposit selected → let theme work normally
-      if (!sellingPlanId) return;
-
-      // 🚨 FORCE WORK ON DAWN
-      e.preventDefault();
-      e.stopImmediatePropagation();
-
-      const variantId = form.querySelector('[name="id"]')?.value;
-      const quantity = parseInt(form.querySelector('[name="quantity"]')?.value || 1);
-
-      if (!variantId) {
-        console.error("❌ No variantId");
-        return;
-      }
-
-      fetch('/cart/add.js', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          id: variantId,
-          quantity: quantity,
-          selling_plan: sellingPlanId
-        })
-      })
-      .then(res => res.json())
-      .then(data => {
-        console.log("✅ Added with selling_plan:", sellingPlanId);
-
-        // Dawn cart refresh
-        document.dispatchEvent(new CustomEvent('cart:added', { detail: data }));
-        document.dispatchEvent(new Event('cart:refresh'));
-      })
-      .catch(err => {
-        console.error("❌ error", err);
-        form.submit(); // fallback
-      });
-
-    }, true); // ✅ capture mode (REQUIRED for Dawn)
-
+    patchFetch();   // 🔥 IMPORTANT
+    updateUI();
+    watchVariant();
   }
 
   document.addEventListener('DOMContentLoaded', init);
