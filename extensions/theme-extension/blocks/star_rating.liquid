@@ -77,12 +77,13 @@
     return checked ? checked.value : '';
   }
 
-  // Simple hidden input (backup for simple themes)
   function injectHiddenInput() {
     const form = getForm();
     if (!form) return;
+
     const spId = getSelectedSellingPlan();
     form.querySelectorAll('input[name="selling_plan"]').forEach(el => el.remove());
+
     if (spId) {
       const input = document.createElement('input');
       input.type = 'hidden';
@@ -92,10 +93,9 @@
     }
   }
 
-  // ==================== CORE FIX ====================
+  // Dawn-specific + general interceptor
   function setupInterceptor() {
     document.addEventListener('click', function (e) {
-      // Find Add to Cart button
       const btn = e.target.closest('button[name="add"], button[type="submit"], [type="submit"]');
       if (!btn) return;
 
@@ -104,21 +104,21 @@
 
       const sellingPlanId = getSelectedSellingPlan();
 
-      // If "Pay full" is selected → let the original theme handle it
+      // Full payment → let Dawn/theme handle normally
       if (!sellingPlanId) {
         injectHiddenInput();
         return;
       }
 
-      // Deposit selected → BLOCK theme behavior and do direct AJAX
+      // Deposit selected → take full control
       e.preventDefault();
       e.stopImmediatePropagation();
 
-      injectHiddenInput(); // extra safety
+      injectHiddenInput();
 
       const variantId = form.querySelector('[name="id"]')?.value;
       const qtyInput = form.querySelector('[name="quantity"]');
-      const quantity = qtyInput ? (parseInt(qtyInput.value) || 1) : 1;
+      const quantity = qtyInput ? parseInt(qtyInput.value) || 1 : 1;
 
       if (!variantId) return;
 
@@ -134,30 +134,27 @@
           selling_plan: sellingPlanId
         })
       })
-      .then(response => response.json())
+      .then(r => r.json())
       .then(data => {
         console.log('✅ Deposit added with selling_plan:', sellingPlanId);
 
-        // Trigger cart drawer / refresh on most themes
+        // Trigger Dawn cart drawer / refresh
         document.dispatchEvent(new CustomEvent('cart:added', { detail: data }));
         document.dispatchEvent(new Event('cart:refresh'));
         document.dispatchEvent(new CustomEvent('product:added', { detail: data }));
       })
       .catch(err => {
-        console.error('Add to cart failed:', err);
-        // Fallback
-        form.submit();
+        console.error(err);
+        form.submit(); // fallback
       });
 
-    }, true); // capture phase - runs before theme code
+    }, true); // capture phase (important for Dawn)
   }
 
   function initRadio() {
     const wrapper = document.querySelector('[data-selling-plan-wrapper]');
-    if (wrapper) {
-      wrapper.addEventListener('change', injectHiddenInput);
-    }
-    setTimeout(injectHiddenInput, 400);
+    if (wrapper) wrapper.addEventListener('change', injectHiddenInput);
+    setTimeout(injectHiddenInput, 300);
   }
 
   function updateUI() {
@@ -187,7 +184,7 @@
     }
   }
 
-  function watchVariant() {
+  function watchVariantChange() {
     let lastId = null;
     setInterval(() => {
       const id = getForm()?.querySelector('[name="id"]')?.value;
@@ -203,9 +200,8 @@
     initRadio();
     setupInterceptor();
     updateUI();
-    watchVariant();
+    watchVariantChange();
 
-    // Extra retries for slow-loading themes
     setTimeout(() => { moveDepositBlock(); injectHiddenInput(); }, 800);
     setTimeout(() => { moveDepositBlock(); injectHiddenInput(); }, 1800);
   }
