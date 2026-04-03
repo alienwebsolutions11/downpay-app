@@ -47,145 +47,91 @@
 
 <script>
 (function () {
-  // ✅ STEP 1: ADD HERE
-  let CURRENT_SELLING_PLAN = '';
-  function getForm() {
-    return document.querySelector('form[action*="/cart/add"]');
+
+  function getSelectedSellingPlan() {
+    const el = document.querySelector('[data-selling-plan]:checked');
+    return el ? el.value : '';
   }
 
-function getSelectedSellingPlan() {
-  return CURRENT_SELLING_PLAN;
-}
+  /* =====================================
+     🔥 1. HANDLE DAWN / MODERN THEMES
+     (product-form.js based themes)
+  ===================================== */
+  document.addEventListener('product:submit', function (event) {
 
-function watchSellingPlanSelection() {
-  document.addEventListener('change', function (e) {
-    if (e.target.matches('[data-selling-plan]')) {
-      CURRENT_SELLING_PLAN = e.target.value;
-      console.log('🧠 Stored selling plan:', CURRENT_SELLING_PLAN);
-    }
-  });
-}
-  // 🔥 CORE FIX: intercept Dawn fetch
-function patchFetch() {
-  const originalFetch = window.fetch;
-
-  window.fetch = async function (url, options) {
-
-    if (
-      typeof url === 'string' &&
-      (url.includes('/cart/add') || url.includes('/cart/add.js')) &&
-      options &&
-      options.body
-    ) {
-      try {
-        const sp = getSelectedSellingPlan();
-        if (!sp) return originalFetch.apply(this, arguments);
-
-        // ✅ JSON BODY
-        if (options.headers?.['Content-Type']?.includes('application/json')) {
-          let body = JSON.parse(options.body);
-
-          // 🔥 CASE 1: items array (Dawn, Refresh, etc.)
-          if (Array.isArray(body.items)) {
-            body.items = body.items.map(item => ({
-              ...item,
-              selling_plan: sp
-            }));
-            console.log('✅ Injected selling_plan into items[]:', sp);
-          }
-
-          // 🔥 CASE 2: direct object
-          else {
-            body.selling_plan = sp;
-            console.log('✅ Injected selling_plan (root):', sp);
-          }
-
-          options.body = JSON.stringify(body);
-        }
-
-        // ✅ FORM DATA
-        else if (options.body instanceof FormData) {
-          options.body.set('selling_plan', sp);
-          console.log('✅ Injected selling_plan (FormData):', sp);
-        }
-
-      } catch (e) {
-        console.error('Fetch patch error', e);
-      }
-    }
-
-    return originalFetch.apply(this, arguments);
-  };
-}
-function patchFormSubmit() {
-  document.addEventListener('submit', function (e) {
-    const form = e.target;
-
-    if (form.action && form.action.includes('/cart/add')) {
+    try {
       const sp = getSelectedSellingPlan();
       if (!sp) return;
 
-      let input = form.querySelector('[name="selling_plan"]');
+      const formData = event.detail?.formData;
 
-      if (!input) {
-        input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'selling_plan';
-        form.appendChild(input);
+      if (formData) {
+        formData.set('selling_plan', sp);
+        console.log('✅ selling_plan added (product:submit)', sp);
       }
 
-      input.value = sp;
-
-      console.log('✅ Injected selling_plan via form submit:', sp);
+    } catch (e) {
+      console.error('Error in product:submit', e);
     }
+
   });
-}
-  // UI sync (optional but good)
-  function updateUI() {
-    const form = getForm();
-    if (!form) return;
 
-    const variantId = form.querySelector('[name="id"]')?.value;
-    if (!variantId) return;
 
-    const variant = window.productData?.variants?.find(v => v.id == variantId);
-    if (!variant) return;
+  /* =====================================
+     🔥 2. FALLBACK (NON-DAWN THEMES)
+  ===================================== */
+  function attachFallback() {
 
-    const price = variant.price;
+    const forms = document.querySelectorAll('form[action*="/cart/add"]');
 
-    const full = document.getElementById('full-price');
-    if (full) full.textContent = '$' + (price / 100).toFixed(2);
+    forms.forEach(form => {
 
-    const dep = document.getElementById('deposit-text');
-    if (dep) {
-      const type = dep.dataset.type;
-      const val = parseFloat(dep.dataset.value);
+      if (form.dataset.spBound) return;
+      form.dataset.spBound = "true";
 
-      if (type === 'percentage') {
-        const amt = (price * val) / 100;
-        dep.textContent = `${val}% deposit ($${(amt / 100).toFixed(2)})`;
-      } else {
-        dep.textContent = '$' + (val / 100).toFixed(2) + ' deposit';
-      }
-    }
+      form.addEventListener('submit', function () {
+
+        const sp = getSelectedSellingPlan();
+
+        let existing = form.querySelector('[name="selling_plan"]');
+        if (existing) existing.remove();
+
+        if (sp) {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = 'selling_plan';
+          input.value = sp;
+          form.appendChild(input);
+
+          console.log('✅ selling_plan added (fallback form)', sp);
+        }
+
+      });
+
+    });
   }
 
-  function watchVariant() {
-    let last;
-    setInterval(() => {
-      const id = getForm()?.querySelector('[name="id"]')?.value;
-      if (id && id !== last) {
-        last = id;
-        updateUI();
-      }
-    }, 300);
+
+  /* =====================================
+     🔁 HANDLE DYNAMIC LOAD (DAWN SECTIONS)
+  ===================================== */
+  function observeDOM() {
+
+    const observer = new MutationObserver(() => {
+      attachFallback();
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
   }
+
 
   function init() {
-   patchFetch();        // AJAX themes
-  patchFormSubmit();   // non-AJAX themes
-  updateUI();
-  watchVariant();
+    attachFallback();
+    observeDOM();
   }
 
   document.addEventListener('DOMContentLoaded', init);
