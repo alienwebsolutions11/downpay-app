@@ -214,95 +214,54 @@ export const action = async ({ request }) => {
 
     // for tags
 
-    // const variables = {
-    //     input: {
-    //         name: lineItemText,
-    //         appId: "newappid",
-    //         merchantCode: purchaseName.toLowerCase().replace(/\s+/g, "_"),
-    //         options: ["Payment option"],
-    //         sellingPlansToCreate: [
-    //             {
-    //                 name: lineItemText,
-    //                 options: ["Deposit"],
-    //                 category: "PRE_ORDER",
-    //                 description: "You will be charged a deposit today and the remaining balance before delivery.",
-    //                 billingPolicy: {
-    //                     fixed: {
-    //                         checkoutCharge:
-    //                             depositType === "percentage"
-    //                                 ? {
-    //                                     type: "PERCENTAGE",
-    //                                     value: { percentage: Number(depositAmount) },
-    //                                 }
-    //                                 : {
-    //                                     type: "PRICE",
-    //                                     value: { fixedValue: Number(depositAmount) },
-    //                                 },
-    //                         ...remainingBalanceConfig,
-    //                     },
-    //                 },
+    const variables = {
+        input: {
+            name: lineItemText,
+            appId: "newappid",
+            merchantCode: purchaseName.toLowerCase().replace(/\s+/g, "_"),
+            options: ["Payment option"],
+            sellingPlansToCreate: [
+                {
+                    name: lineItemText,
+                    options: ["Deposit"],
+                    category: "PRE_ORDER",
+                    description: "You will be charged a deposit today and the remaining balance before delivery.",
+                    billingPolicy: {
+                        fixed: {
+                            checkoutCharge:
+                                depositType === "percentage"
+                                    ? {
+                                        type: "PERCENTAGE",
+                                        value: { percentage: Number(depositAmount) },
+                                    }
+                                    : {
+                                        type: "PRICE",
+                                        value: { fixedValue: Number(depositAmount) },
+                                    },
+                            ...remainingBalanceConfig,
+                        },
+                    },
 
 
 
-    //                 inventoryPolicy: {
-    //                     reserve: "ON_SALE",
-    //                 },
-    //                 deliveryPolicy: {
-    //                     fixed: {
-    //                         fulfillmentTrigger: "ASAP",
-    //                     },
-    //                 },
-    //             },
-    //         ],
+                    inventoryPolicy: {
+                        reserve: "ON_SALE",
+                    },
+                    deliveryPolicy: {
+                        fixed: {
+                            fulfillmentTrigger: "ASAP",
+                        },
+                    },
+                },
+            ],
 
-    //     },
-    //     // resources: {
-    //     //   productIds: finalProductIds,
-    //     //     productVariantIds: variantIds,
-    //     // },
-    // };
-const normalizedProductIds = finalProductIds.map(id =>
-  id.includes("gid://") ? id : `gid://shopify/Product/${id}`
-);
-
-const variables = {
-  input: {
-    name: lineItemText,
-    appId: "newappid",
-    merchantCode: purchaseName.toLowerCase().replace(/\s+/g, "_"),
-    options: ["Payment option"],
-    sellingPlansToCreate: [
-      {
-        name: lineItemText,
-        options: ["Deposit"],
-        category: "PRE_ORDER",
-        billingPolicy: {
-          fixed: {
-            checkoutCharge:
-              depositType === "percentage"
-                ? {
-                    type: "PERCENTAGE",
-                    value: { percentage: Number(depositAmount) },
-                  }
-                : {
-                    type: "PRICE",
-                    value: { fixedValue: Number(depositAmount) },
-                  },
-          },
         },
-        deliveryPolicy: {
-          fixed: { fulfillmentTrigger: "ASAP" },
-        },
-        inventoryPolicy: { reserve: "ON_SALE" },
-      },
-    ],
-  },
+        // resources: {
+        //   productIds: finalProductIds,
+        //     productVariantIds: variantIds,
+        // },
+    };
 
-  // ✅ ONLY products (remove variants here)
-  resources: {
-    productIds: normalizedProductIds,
-  },
-};
     const response = await admin.graphql(CREATE_SELLING_PLAN, {
         variables,
     });
