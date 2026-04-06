@@ -38,26 +38,28 @@
 <script>
 (function () {
 
-  function getSelectedSellingPlan() {
+  // ✅ Get selected plan
+  function getSellingPlan() {
     const checked = document.querySelector('[data-selling-plan]:checked');
     return checked ? checked.value : '';
   }
 
-  function interceptAddToCart() {
-    if (window.__spClickBound) return;
-    window.__spClickBound = true;
+  // ✅ Attach ONE global handler (no duplicates)
+  function bindSellingPlan() {
+    if (window.__spFinalBound) return;
+    window.__spFinalBound = true;
 
-    document.addEventListener('click', function (e) {
+    // 🔥 Runs BEFORE Shopify handles form (MOST IMPORTANT)
+    document.addEventListener('submit', function (e) {
 
-      const btn = e.target.closest('button[name="add"], [type="submit"]');
-      if (!btn) return;
+      const form = e.target;
 
-      const form = btn.closest('form');
-      if (!form) return;
+      // only product forms
+      if (!form.matches('form[action*="/cart/add"]')) return;
 
-      const sp = getSelectedSellingPlan();
+      const sp = getSellingPlan();
 
-      console.log("🛒 Add to cart clicked. SP:", sp);
+      console.log('🛒 Form submit detected. SP:', sp);
 
       // remove old
       form.querySelector('input[name="selling_plan"]')?.remove();
@@ -71,17 +73,19 @@
 
         form.appendChild(input);
 
-        console.log("✅ selling_plan injected:", sp);
+        console.log('✅ selling_plan added:', sp);
       } else {
-        console.log("🧹 Pay full (no plan)");
+        console.log('🧹 Pay full selected');
       }
 
-    }, true); // 🔥 use capture (VERY IMPORTANT)
+    }, true); // 🔥 capture = MUST
+
   }
 
+  // ✅ Init safely
   function init() {
-    interceptAddToCart();
-    console.log("🚀 SP final fix loaded");
+    bindSellingPlan();
+    console.log('✅ Selling Plan FINAL loaded');
   }
 
   if (document.readyState === 'loading') {
@@ -93,7 +97,17 @@
   document.addEventListener('shopify:section:load', init);
 
 })();
-</script>
+</script>document.addEventListener('click', function (e) {
+
+  const btn = e.target.closest('button[name="add"]');
+  if (!btn) return;
+
+  const sp = document.querySelector('[data-selling-plan]:checked')?.value;
+
+  console.log('🛒 Button click SP:', sp);
+
+}, true);
+
 {% schema %}
 {
   "name": "Deposit Option",
