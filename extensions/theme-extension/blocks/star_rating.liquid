@@ -38,68 +38,38 @@
 <script>
 (function () {
 
-  function getSelectedSellingPlan() {
-    const checked = document.querySelector('[data-selling-plan]:checked');
-    return checked ? checked.value : '';
+  // ✅ ALWAYS get selected plan (global — safest fallback)
+  function getSellingPlan() {
+    const el = document.querySelector('[data-selling-plan]:checked');
+    return el ? el.value : '';
   }
 
-  // ✅ Inject into form (for non-AJAX themes)
-  function injectSellingPlanToForm(form) {
-    if (!form) return;
-
-    let input = form.querySelector('[name="selling_plan"]');
-
-    if (!input) {
-      input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = 'selling_plan';
-      form.appendChild(input);
-    }
-
-    input.value = getSelectedSellingPlan() || '';
-  }
-
-  function attachFormListener() {
-    document.querySelectorAll('form[action*="/cart/add"]').forEach(form => {
-
-      if (form.dataset.sellingPlanBound) return;
-      form.dataset.sellingPlanBound = "true";
-
-      form.addEventListener('submit', function () {
-        injectSellingPlanToForm(form);
-      });
-    });
-  }
-
-  // ✅ 🔥 PATCH FETCH (FOR DAWN + AJAX THEMES)
+  // ✅ PATCH FETCH (modern themes like Dawn)
   function patchFetch() {
-    if (window.__sellingPlanPatched) return;
-    window.__sellingPlanPatched = true;
+    if (window.__spFetchPatched) return;
+    window.__spFetchPatched = true;
 
     const originalFetch = window.fetch;
 
-    window.fetch = async function (url, options = {}) {
+    window.fetch = function (url, options = {}) {
 
       if (typeof url === 'string' && url.includes('/cart/add')) {
 
-        const sp = getSelectedSellingPlan();
+        const sp = getSellingPlan();
 
         if (sp && options.body) {
           try {
-            // JSON request
-            if (options.headers && options.headers['Content-Type']?.includes('application/json')) {
-              const body = JSON.parse(options.body);
-              body.selling_plan = sp;
-              options.body = JSON.stringify(body);
-            }
-
-            // FormData request
-            else if (options.body instanceof FormData) {
+            if (options.body instanceof FormData) {
               options.body.set('selling_plan', sp);
+            } else if (typeof options.body === 'string') {
+              try {
+                const json = JSON.parse(options.body);
+                json.selling_plan = sp;
+                options.body = JSON.stringify(json);
+              } catch {}
             }
-
           } catch (e) {
-            console.log('Selling plan error:', e);
+            console.log('SP fetch error', e);
           }
         }
       }
@@ -108,19 +78,37 @@
     };
   }
 
-  // ✅ Handle dynamic DOM (Dawn re-render)
-  const observer = new MutationObserver(() => {
-    attachFormListener();
-  });
+  // ✅ PATCH XHR (older / custom themes)
+  function patchXHR() {
+    if (window.__spXHRPatched) return;
+    window.__spXHRPatched = true;
+
+    const originalOpen = XMLHttpRequest.prototype.open;
+    const originalSend = XMLHttpRequest.prototype.send;
+
+    XMLHttpRequest.prototype.open = function(method, url) {
+      this._url = url;
+      return originalOpen.apply(this, arguments);
+    };
+
+    XMLHttpRequest.prototype.send = function(body) {
+
+      if (this._url && this._url.includes('/cart/add')) {
+
+        const sp = getSellingPlan();
+
+        if (sp && body instanceof FormData) {
+          body.set('selling_plan', sp);
+        }
+      }
+
+      return originalSend.apply(this, arguments);
+    };
+  }
 
   function init() {
-    attachFormListener();
     patchFetch();
-
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
+    patchXHR();
   }
 
   document.addEventListener('DOMContentLoaded', init);
