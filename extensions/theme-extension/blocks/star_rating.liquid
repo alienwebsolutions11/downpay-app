@@ -38,115 +38,126 @@
 <script>
 (function () {
 
- function initSellingPlans() {
-
-  document.addEventListener('change', function (e) {
-  if (!e.target.matches('[data-selling-plan]')) return;
-
-  const wrapper = document.querySelector('[data-selling-plan-wrapper]');
-  const form = document.querySelector('product-form form') 
-            || document.querySelector('form[action*="/cart/add"]');
-
-  if (!wrapper || !form) return;
-
-  form.querySelector('input[name="selling_plan"]')?.remove();
-
-  if (e.target.value) {
-    const input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = 'selling_plan';
-    input.value = e.target.value;
-    form.appendChild(input);
-  }
-});
-
-  // 🔥 FORCE DEFAULT = PAY FULL
-  const defaultRadio = wrapper.querySelector('[data-selling-plan][value=""]');
-  if (defaultRadio) {
-    defaultRadio.checked = true;
-
-    // remove any existing selling_plan
-    form.querySelector('input[name="selling_plan"]')?.remove();
-  }
-}
-
-  // ✅ Get current variant ID
-  function getCurrentVariantId() {
-    const form = document.querySelector('form[action*="/cart/add"]');
-    if (!form) return null;
-
-    const input = form.querySelector('[name="id"]');
-    return input ? input.value : null;
+  function getSelectedSellingPlan() {
+    const checked = document.querySelector('[data-selling-plan]:checked');
+    return checked ? checked.value : '';
   }
 
-  // ✅ Update UI (price + deposit)
-  function updateUI() {
+  // ✅ ADD HIDDEN INPUT ON CHANGE (FOR NORMAL FORMS)
+  function handleChangeEvent() {
+    document.addEventListener('change', function (e) {
+      if (!e.target.matches('[data-selling-plan]')) return;
 
-    const variantId = getCurrentVariantId();
-    if (!variantId) return;
+      const form = document.querySelector('product-form form') 
+                || document.querySelector('form[action*="/cart/add"]');
 
-    const product = window.productData;
-    if (!product) return;
+      if (!form) return;
 
-    const variant = product.variants.find(v => v.id == variantId);
-    if (!variant) return;
+      // remove old
+      form.querySelector('input[name="selling_plan"]')?.remove();
 
-    const price = variant.price;
+      // add new
+      if (e.target.value) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'selling_plan';
+        input.value = e.target.value;
 
-    // 🔹 Update full price
-    const fullPrice = document.getElementById('full-price');
-    if (fullPrice) {
-      fullPrice.innerText = formatMoney(price);
-    }
+        form.appendChild(input);
+        console.log('✅ Hidden input added:', input.value);
+      } else {
+        console.log('🧹 Pay full selected → no selling_plan');
+      }
+    });
+  }
 
-    // 🔹 Update deposit
-    const depositEl = document.getElementById('deposit-text');
-    if (depositEl) {
+  // ✅ FETCH PATCH (FOR DAWN AJAX)
+  function patchFetch() {
+    if (window.__ultimateSPPatched) return;
+    window.__ultimateSPPatched = true;
 
-      const type = depositEl.dataset.type;
-      const value = parseFloat(depositEl.dataset.value);
+    const originalFetch = window.fetch;
 
-      if (type === 'percentage') {
-        let deposit = (price * value) / 100;
-        depositEl.innerText = value + '% deposit ($' + (deposit/100).toFixed(2) + ')';
+    window.fetch = async function (url, options = {}) {
+
+      if (typeof url === 'string' && url.includes('/cart/add')) {
+
+        let sp = getSelectedSellingPlan();
+
+        if (!sp) return originalFetch.apply(this, arguments);
+
+        try {
+          if (options.body instanceof FormData) {
+            options.body.set('selling_plan', sp);
+          }
+
+          else if (typeof options.body === 'string') {
+            let body;
+
+            try {
+              body = JSON.parse(options.body);
+            } catch {
+              return originalFetch.apply(this, arguments);
+            }
+
+            if (body.items && Array.isArray(body.items)) {
+              body.items.forEach(item => {
+                item.selling_plan = sp;
+              });
+            } else {
+              body.selling_plan = sp;
+            }
+
+            options.body = JSON.stringify(body);
+          }
+
+        } catch (e) {
+          console.log('SP ERROR:', e);
+        }
       }
 
-      if (type === 'price') {
-        depositEl.innerText = formatMoney(value);
+      return originalFetch.apply(this, arguments);
+    };
+  }
+
+  // ✅ XHR PATCH (BACKUP)
+  function patchXHR() {
+    if (window.__ultimateXHRPatched) return;
+    window.__ultimateXHRPatched = true;
+
+    const originalOpen = XMLHttpRequest.prototype.open;
+    const originalSend = XMLHttpRequest.prototype.send;
+
+    XMLHttpRequest.prototype.open = function(method, url) {
+      this._url = url;
+      return originalOpen.apply(this, arguments);
+    };
+
+    XMLHttpRequest.prototype.send = function(body) {
+
+      if (this._url && this._url.includes('/cart/add')) {
+
+        let sp = getSelectedSellingPlan();
+
+        if (sp && body instanceof FormData) {
+          body.set('selling_plan', sp);
+        }
       }
-    }
+
+      return originalSend.apply(this, arguments);
+    };
   }
 
-  // 💰 money format
-  function formatMoney(cents) {
-    return '$' + (cents / 100).toFixed(2);
+  function init() {
+    patchFetch();
+    patchXHR();
+    handleChangeEvent();
+
+    console.log("🚀 Selling Plan script initialized");
   }
 
-  // 🔥 WATCH variant change (FINAL FIX)
-  function watchVariantChange() {
-    let lastVariantId = null;
-
-    setInterval(() => {
-      const currentId = getCurrentVariantId();
-
-      if (currentId && currentId !== lastVariantId) {
-        lastVariantId = currentId;
-        updateUI();
-      }
-
-    }, 200);
-  }
-
-  document.addEventListener('DOMContentLoaded', function(){
-    initSellingPlans();
-    updateUI();
-    watchVariantChange(); 
-  });
-
-  document.addEventListener('shopify:section:load', function(){
-    initSellingPlans();
-    updateUI();
-  });
+  document.addEventListener('DOMContentLoaded', init);
+  document.addEventListener('shopify:section:load', init);
 
 })();
 </script>
