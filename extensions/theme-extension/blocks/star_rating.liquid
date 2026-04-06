@@ -38,104 +38,115 @@
 <script>
 (function () {
 
-  function getSelectedSellingPlan() {
-    const checked = document.querySelector('[data-selling-plan]:checked');
-    return checked ? checked.value : '';
+ function initSellingPlans() {
+
+  document.addEventListener('change', function (e) {
+  if (!e.target.matches('[data-selling-plan]')) return;
+
+  const wrapper = document.querySelector('[data-selling-plan-wrapper]');
+  const form = document.querySelector('product-form form') 
+            || document.querySelector('form[action*="/cart/add"]');
+
+  if (!wrapper || !form) return;
+
+  form.querySelector('input[name="selling_plan"]')?.remove();
+
+  if (e.target.value) {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'selling_plan';
+    input.value = e.target.value;
+    form.appendChild(input);
+  }
+});
+
+  // 🔥 FORCE DEFAULT = PAY FULL
+  const defaultRadio = wrapper.querySelector('[data-selling-plan][value=""]');
+  if (defaultRadio) {
+    defaultRadio.checked = true;
+
+    // remove any existing selling_plan
+    form.querySelector('input[name="selling_plan"]')?.remove();
+  }
+}
+
+  // ✅ Get current variant ID
+  function getCurrentVariantId() {
+    const form = document.querySelector('form[action*="/cart/add"]');
+    if (!form) return null;
+
+    const input = form.querySelector('[name="id"]');
+    return input ? input.value : null;
   }
 
-  function patchFetch() {
-    if (window.__ultimateSPPatched) return;
-    window.__ultimateSPPatched = true;
+  // ✅ Update UI (price + deposit)
+  function updateUI() {
 
-    const originalFetch = window.fetch;
+    const variantId = getCurrentVariantId();
+    if (!variantId) return;
 
-    window.fetch = async function (url, options = {}) {
+    const product = window.productData;
+    if (!product) return;
 
-      if (typeof url === 'string' && url.includes('/cart/add')) {
+    const variant = product.variants.find(v => v.id == variantId);
+    if (!variant) return;
 
-        let sp = getSelectedSellingPlan();
+    const price = variant.price;
 
-        if (!sp) return originalFetch.apply(this, arguments);
+    // 🔹 Update full price
+    const fullPrice = document.getElementById('full-price');
+    if (fullPrice) {
+      fullPrice.innerText = formatMoney(price);
+    }
 
-        try {
-          if (options.body instanceof FormData) {
-            options.body.set('selling_plan', sp);
-          }
+    // 🔹 Update deposit
+    const depositEl = document.getElementById('deposit-text');
+    if (depositEl) {
 
-          else if (typeof options.body === 'string') {
-            let body;
+      const type = depositEl.dataset.type;
+      const value = parseFloat(depositEl.dataset.value);
 
-            try {
-              body = JSON.parse(options.body);
-            } catch {
-              return originalFetch.apply(this, arguments);
-            }
-
-            // 🔥 HANDLE DAWN FORMAT
-            if (body.items && Array.isArray(body.items)) {
-              body.items.forEach(item => {
-                item.selling_plan = sp;
-              });
-            }
-
-            // 🔥 HANDLE NORMAL FORMAT
-            else {
-              body.selling_plan = sp;
-            }
-
-            options.body = JSON.stringify(body);
-          }
-
-        } catch (e) {
-          console.log('SP ERROR:', e);
-        }
+      if (type === 'percentage') {
+        let deposit = (price * value) / 100;
+        depositEl.innerText = value + '% deposit ($' + (deposit/100).toFixed(2) + ')';
       }
 
-      return originalFetch.apply(this, arguments);
-    };
+      if (type === 'price') {
+        depositEl.innerText = formatMoney(value);
+      }
+    }
   }
 
-  function patchXHR() {
-    if (window.__ultimateXHRPatched) return;
-    window.__ultimateXHRPatched = true;
+  // 💰 money format
+  function formatMoney(cents) {
+    return '$' + (cents / 100).toFixed(2);
+  }
 
-    const originalOpen = XMLHttpRequest.prototype.open;
-    const originalSend = XMLHttpRequest.prototype.send;
+  // 🔥 WATCH variant change (FINAL FIX)
+  function watchVariantChange() {
+    let lastVariantId = null;
 
-    XMLHttpRequest.prototype.open = function(method, url) {
-      this._url = url;
-      return originalOpen.apply(this, arguments);
-    };
+    setInterval(() => {
+      const currentId = getCurrentVariantId();
 
-    XMLHttpRequest.prototype.send = function(body) {
-
-      if (this._url && this._url.includes('/cart/add')) {
-
-        let sp = getSelectedSellingPlan();
-
-        if (sp && body instanceof FormData) {
-          body.set('selling_plan', sp);
-        }
+      if (currentId && currentId !== lastVariantId) {
+        lastVariantId = currentId;
+        updateUI();
       }
 
-      return originalSend.apply(this, arguments);
-    };
+    }, 200);
   }
 
-  function debug() {
-    console.log('Selling plan selected:', getSelectedSellingPlan());
-  }
+  document.addEventListener('DOMContentLoaded', function(){
+    initSellingPlans();
+    updateUI();
+    watchVariantChange(); 
+  });
 
-  function init() {
-    patchFetch();
-    patchXHR();
-
-    // Debug (remove later)
-    setInterval(debug, 2000);
-  }
-
-  document.addEventListener('DOMContentLoaded', init);
-  document.addEventListener('shopify:section:load', init);
+  document.addEventListener('shopify:section:load', function(){
+    initSellingPlans();
+    updateUI();
+  });
 
 })();
 </script>
