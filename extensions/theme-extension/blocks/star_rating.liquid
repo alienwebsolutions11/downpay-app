@@ -2,6 +2,7 @@
   .options_purchase_radio_btn {
     display: block;
     margin-bottom: 6px;
+    cursor: pointer;
   }
 </style>
 
@@ -10,138 +11,94 @@
 </script>
 
 <fieldset data-selling-plan-wrapper>
-  <legend>Deposit only due at checkout</legend>
+  <legend>Choose payment option</legend>
 
   {% assign first_plan = product.selling_plan_groups.first.selling_plans.first %}
+  
   {% if first_plan %}
     <label class="options_purchase_radio_btn">
-      <input type="radio"
-             name="selling_plan_option"
-             value="{{ first_plan.id }}"
-             data-selling-plan>
+      <input
+        type="radio"
+        name="selling_plan_option"
+        value="{{ first_plan.id }}"
+        data-selling-plan
+      >
       Deposit
     </label>
   {% endif %}
 
   <label class="options_purchase_radio_btn">
-    <input type="radio"
-           name="selling_plan_option"
-           value=""
-           data-selling-plan
-           checked>
+    <input
+      type="radio"
+      name="selling_plan_option"
+      value=""
+      data-selling-plan
+      checked
+    >
     Pay full
   </label>
 </fieldset>
 
 <script>
-(function() {
-  const productData = {{ product | json }};
+(function () {
 
-  // 🔹 Get the product form dynamically
-  function getForm() {
-    return document.querySelector('form[action*="/cart/add"]');
-  }
-
-  // 🔹 Get selected selling plan
+  // ✅ Get selected selling plan
   function getSelectedSellingPlan() {
     const checked = document.querySelector('[data-selling-plan]:checked');
     return checked ? checked.value : '';
   }
 
-  // 🔹 Patch fetch and XMLHttpRequest to inject selling_plan
-  function patchCartRequests() {
-    // Fetch patch
-    const originalFetch = window.fetch;
-    window.fetch = async function(url, options) {
-      if (url.includes('/cart/add') && options) {
-        try {
-          // JSON body
-          if (options.headers?.['Content-Type']?.includes('application/json')) {
-            const body = JSON.parse(options.body);
-            const sp = getSelectedSellingPlan();
-            if (sp) body.selling_plan = sp;
-            options.body = JSON.stringify(body);
-          }
-          // FormData fallback
-          else if (options.body instanceof FormData) {
-            const sp = getSelectedSellingPlan();
-            if (sp) options.body.set('selling_plan', sp);
-          }
-        } catch(e) { console.error('Selling plan injection error', e); }
-      }
-      return originalFetch.apply(this, arguments);
-    };
+  // ✅ Inject selling_plan into form
+  function injectSellingPlanToForm(form) {
+    if (!form) return;
 
-    // XHR patch (for older themes using XMLHttpRequest)
-    const originalXHR = window.XMLHttpRequest;
-    function CustomXHR() {
-      const xhr = new originalXHR();
-      const originalOpen = xhr.open;
-      xhr.open = function(method, url, async) {
-        this._url = url;
-        return originalOpen.apply(this, arguments);
-      };
-      const originalSend = xhr.send;
-      xhr.send = function(body) {
-        if (this._url.includes('/cart/add')) {
-          try {
-            if (body instanceof FormData) {
-              const sp = getSelectedSellingPlan();
-              if (sp) body.set('selling_plan', sp);
-            }
-          } catch(e) { console.error(e); }
-        }
-        return originalSend.apply(this, arguments);
-      };
-      return xhr;
+    let input = form.querySelector('[name="selling_plan"]');
+
+    // Create hidden input if not exists
+    if (!input) {
+      input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'selling_plan';
+      form.appendChild(input);
     }
-    window.XMLHttpRequest = CustomXHR;
+
+    // Set value
+    input.value = getSelectedSellingPlan() || '';
   }
 
-  // 🔹 Update price display (optional)
-  function updatePrices() {
-    const form = getForm();
-    if (!form) return;
-    const variantId = form.querySelector('[name="id"]')?.value;
-    if (!variantId) return;
-    const variant = productData.variants.find(v => v.id == variantId);
-    if (!variant) return;
+  // ✅ Attach submit listener to ALL product forms
+  function attachFormListener() {
+    const forms = document.querySelectorAll('form[action*="/cart/add"]');
 
-    document.querySelectorAll('[data-selling-plan-wrapper]').forEach(wrapper => {
-      // Update deposit display
-      wrapper.querySelectorAll('[data-type="deposit"]').forEach(el => {
-        const percent = parseFloat(el.dataset.value || 50);
-        const amt = ((variant.price * percent) / 100 / 100).toFixed(2);
-        el.textContent = `${percent}% deposit ($${amt})`;
-      });
-      // Update full price display
-      wrapper.querySelectorAll('[data-type="full"]').forEach(el => {
-        el.textContent = '$' + (variant.price / 100).toFixed(2);
+    forms.forEach(form => {
+
+      // prevent duplicate binding
+      if (form.dataset.sellingPlanBound) return;
+      form.dataset.sellingPlanBound = "true";
+
+      form.addEventListener('submit', function () {
+        injectSellingPlanToForm(form);
       });
     });
   }
 
-  // 🔹 Watch for variant changes
-  function watchVariantChange() {
-    let lastVariant;
-    setInterval(() => {
-      const variantId = getForm()?.querySelector('[name="id"]')?.value;
-      if (variantId && variantId !== lastVariant) {
-        lastVariant = variantId;
-        updatePrices();
-      }
-    }, 300);
-  }
+  // ✅ Handle dynamic themes like Dawn
+  const observer = new MutationObserver(() => {
+    attachFormListener();
+  });
 
-  // 🔹 Init
   function init() {
-    patchCartRequests();
-    updatePrices();
-    watchVariantChange();
+    attachFormListener();
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
   }
 
   document.addEventListener('DOMContentLoaded', init);
   document.addEventListener('shopify:section:load', init);
+
 })();
 </script>
 
@@ -149,7 +106,9 @@
 {
   "name": "Deposit Option",
   "target": "section",
-  "enabled_on": { "templates": ["product"] },
+  "enabled_on": {
+    "templates": ["product"]
+  },
   "settings": []
 }
 {% endschema %}
