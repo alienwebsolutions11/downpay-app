@@ -38,36 +38,30 @@
 <script>
 (function () {
 
-  // ✅ Get selected selling plan
-  function getSelectedSellingPlan() {
-    const checked = document.querySelector('[data-selling-plan]:checked');
-    return checked ? checked.value : '';
-  }
+  // 🔥 ALWAYS run and re-run (Dawn reload fix)
+  function attachSellingPlanHandler() {
 
-  // ✅ HANDLE CHANGE (ONLY ONCE - GLOBAL)
-  function handleChangeEvent() {
-    if (window.__spChangeAttached) return;
-    window.__spChangeAttached = true;
+    console.log("🚀 Attaching selling plan handler...");
 
     document.addEventListener('change', function (e) {
+
       if (!e.target.matches('[data-selling-plan]')) return;
 
-      console.log('🔥 Selling plan changed:', e.target.value);
+      console.log("🔥 Change detected:", e.target.value);
 
-      // 🔥 ALWAYS get correct form (important for Dawn)
-      const form = e.target.closest('form')
-        || document.querySelector('product-form form')
-        || document.querySelector('form[action*="/cart/add"]');
+      // ✅ Always get correct form dynamically
+      const form = e.target.closest('form');
 
       if (!form) {
-        console.log('❌ Form not found');
+        console.log("❌ No form found");
         return;
       }
 
-      // remove old input
-      form.querySelector('input[name="selling_plan"]')?.remove();
+      // 🧹 remove old input
+      const oldInput = form.querySelector('input[name="selling_plan"]');
+      if (oldInput) oldInput.remove();
 
-      // add new input
+      // ✅ add new input
       if (e.target.value) {
         const input = document.createElement('input');
         input.type = 'hidden';
@@ -76,114 +70,27 @@
 
         form.appendChild(input);
 
-        console.log('✅ Hidden input added:', input.value);
+        console.log("✅ selling_plan added:", input.value);
       } else {
-        console.log('🧹 Pay full selected');
+        console.log("🧹 Pay full selected");
       }
+
     });
   }
 
-  // ✅ PATCH FETCH (DAWN AJAX)
-  function patchFetch() {
-    if (window.__spFetchPatched) return;
-    window.__spFetchPatched = true;
-
-    const originalFetch = window.fetch;
-
-    window.fetch = async function (url, options = {}) {
-
-      if (typeof url === 'string' && url.includes('/cart/add')) {
-
-        let sp = getSelectedSellingPlan();
-
-        if (!sp) return originalFetch.apply(this, arguments);
-
-        try {
-          if (options.body instanceof FormData) {
-            options.body.set('selling_plan', sp);
-          }
-
-          else if (typeof options.body === 'string') {
-            let body;
-
-            try {
-              body = JSON.parse(options.body);
-            } catch {
-              return originalFetch.apply(this, arguments);
-            }
-
-            if (body.items && Array.isArray(body.items)) {
-              body.items.forEach(item => {
-                item.selling_plan = sp;
-              });
-            } else {
-              body.selling_plan = sp;
-            }
-
-            options.body = JSON.stringify(body);
-          }
-
-          console.log('🚀 Selling plan added to fetch:', sp);
-
-        } catch (e) {
-          console.log('SP FETCH ERROR:', e);
-        }
-      }
-
-      return originalFetch.apply(this, arguments);
-    };
-  }
-
-  // ✅ PATCH XHR (BACKUP)
-  function patchXHR() {
-    if (window.__spXHRPatched) return;
-    window.__spXHRPatched = true;
-
-    const originalOpen = XMLHttpRequest.prototype.open;
-    const originalSend = XMLHttpRequest.prototype.send;
-
-    XMLHttpRequest.prototype.open = function(method, url) {
-      this._url = url;
-      return originalOpen.apply(this, arguments);
-    };
-
-    XMLHttpRequest.prototype.send = function(body) {
-
-      if (this._url && this._url.includes('/cart/add')) {
-
-        let sp = getSelectedSellingPlan();
-
-        if (sp && body instanceof FormData) {
-          body.set('selling_plan', sp);
-          console.log('🚀 Selling plan added via XHR:', sp);
-        }
-      }
-
-      return originalSend.apply(this, arguments);
-    };
-  }
-
-  // ✅ INIT (SAFE FOR ALL CASES)
+  // 🔁 IMPORTANT: run multiple times safely
   function init() {
-    patchFetch();
-    patchXHR();
-    handleChangeEvent();
-
-    console.log("✅ Selling Plan Script Loaded");
+    attachSellingPlanHandler();
   }
 
-  // ✅ RUN SAFELY (IMPORTANT)
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
+  // ✅ Run on load
+  document.addEventListener('DOMContentLoaded', init);
 
+  // ✅ Run when Dawn reloads section (VERY IMPORTANT)
   document.addEventListener('shopify:section:load', init);
 
 })();
 </script>
-
 {% schema %}
 {
   "name": "Deposit Option",
