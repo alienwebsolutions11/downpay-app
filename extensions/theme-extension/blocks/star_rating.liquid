@@ -38,55 +38,58 @@
 <script>
 (function () {
 
-  // 🔥 ALWAYS run and re-run (Dawn reload fix)
-  function attachSellingPlanHandler() {
+  function getSelectedSellingPlan() {
+    const checked = document.querySelector('[data-selling-plan]:checked');
+    return checked ? checked.value : '';
+  }
 
-    console.log("🚀 Attaching selling plan handler...");
+  function interceptAddToCart() {
+    if (window.__spClickBound) return;
+    window.__spClickBound = true;
 
-    document.addEventListener('change', function (e) {
+    document.addEventListener('click', function (e) {
 
-      if (!e.target.matches('[data-selling-plan]')) return;
+      const btn = e.target.closest('button[name="add"], [type="submit"]');
+      if (!btn) return;
 
-      console.log("🔥 Change detected:", e.target.value);
+      const form = btn.closest('form');
+      if (!form) return;
 
-      // ✅ Always get correct form dynamically
-      const form = e.target.closest('form');
+      const sp = getSelectedSellingPlan();
 
-      if (!form) {
-        console.log("❌ No form found");
-        return;
-      }
+      console.log("🛒 Add to cart clicked. SP:", sp);
 
-      // 🧹 remove old input
-      const oldInput = form.querySelector('input[name="selling_plan"]');
-      if (oldInput) oldInput.remove();
+      // remove old
+      form.querySelector('input[name="selling_plan"]')?.remove();
 
-      // ✅ add new input
-      if (e.target.value) {
+      // add new
+      if (sp) {
         const input = document.createElement('input');
         input.type = 'hidden';
         input.name = 'selling_plan';
-        input.value = e.target.value;
+        input.value = sp;
 
         form.appendChild(input);
 
-        console.log("✅ selling_plan added:", input.value);
+        console.log("✅ selling_plan injected:", sp);
       } else {
-        console.log("🧹 Pay full selected");
+        console.log("🧹 Pay full (no plan)");
       }
 
-    });
+    }, true); // 🔥 use capture (VERY IMPORTANT)
   }
 
-  // 🔁 IMPORTANT: run multiple times safely
   function init() {
-    attachSellingPlanHandler();
+    interceptAddToCart();
+    console.log("🚀 SP final fix loaded");
   }
 
-  // ✅ Run on load
-  document.addEventListener('DOMContentLoaded', init);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
 
-  // ✅ Run when Dawn reloads section (VERY IMPORTANT)
   document.addEventListener('shopify:section:load', init);
 
 })();
