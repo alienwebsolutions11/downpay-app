@@ -17,24 +17,20 @@
   
   {% if first_plan %}
     <label class="options_purchase_radio_btn">
-      <input
-        type="radio"
-        name="selling_plan_option"
-        value="{{ first_plan.id }}"
-        data-selling-plan
-      >
+      <input type="radio"
+             name="selling_plan_option"
+             value="{{ first_plan.id }}"
+             data-selling-plan>
       Deposit
     </label>
   {% endif %}
 
   <label class="options_purchase_radio_btn">
-    <input
-      type="radio"
-      name="selling_plan_option"
-      value=""
-      data-selling-plan
-      checked
-    >
+    <input type="radio"
+           name="selling_plan_option"
+           value=""
+           data-selling-plan
+           checked>
     Pay full
   </label>
 </fieldset>
@@ -42,19 +38,17 @@
 <script>
 (function () {
 
-  // ✅ Get selected selling plan
   function getSelectedSellingPlan() {
     const checked = document.querySelector('[data-selling-plan]:checked');
     return checked ? checked.value : '';
   }
 
-  // ✅ Inject selling_plan into form
+  // ✅ Inject into form (for non-AJAX themes)
   function injectSellingPlanToForm(form) {
     if (!form) return;
 
     let input = form.querySelector('[name="selling_plan"]');
 
-    // Create hidden input if not exists
     if (!input) {
       input = document.createElement('input');
       input.type = 'hidden';
@@ -62,17 +56,12 @@
       form.appendChild(input);
     }
 
-    // Set value
     input.value = getSelectedSellingPlan() || '';
   }
 
-  // ✅ Attach submit listener to ALL product forms
   function attachFormListener() {
-    const forms = document.querySelectorAll('form[action*="/cart/add"]');
+    document.querySelectorAll('form[action*="/cart/add"]').forEach(form => {
 
-    forms.forEach(form => {
-
-      // prevent duplicate binding
       if (form.dataset.sellingPlanBound) return;
       form.dataset.sellingPlanBound = "true";
 
@@ -82,13 +71,51 @@
     });
   }
 
-  // ✅ Handle dynamic themes like Dawn
+  // ✅ 🔥 PATCH FETCH (FOR DAWN + AJAX THEMES)
+  function patchFetch() {
+    if (window.__sellingPlanPatched) return;
+    window.__sellingPlanPatched = true;
+
+    const originalFetch = window.fetch;
+
+    window.fetch = async function (url, options = {}) {
+
+      if (typeof url === 'string' && url.includes('/cart/add')) {
+
+        const sp = getSelectedSellingPlan();
+
+        if (sp && options.body) {
+          try {
+            // JSON request
+            if (options.headers && options.headers['Content-Type']?.includes('application/json')) {
+              const body = JSON.parse(options.body);
+              body.selling_plan = sp;
+              options.body = JSON.stringify(body);
+            }
+
+            // FormData request
+            else if (options.body instanceof FormData) {
+              options.body.set('selling_plan', sp);
+            }
+
+          } catch (e) {
+            console.log('Selling plan error:', e);
+          }
+        }
+      }
+
+      return originalFetch.apply(this, arguments);
+    };
+  }
+
+  // ✅ Handle dynamic DOM (Dawn re-render)
   const observer = new MutationObserver(() => {
     attachFormListener();
   });
 
   function init() {
     attachFormListener();
+    patchFetch();
 
     observer.observe(document.body, {
       childList: true,
