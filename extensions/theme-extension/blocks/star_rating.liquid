@@ -36,7 +36,9 @@
 
   let selectedPlan = '';
 
-  // ✅ Track radio selection
+  // =========================
+  // ✅ TRACK RADIO SELECTION
+  // =========================
   document.addEventListener('change', function (e) {
     if (!e.target.matches('[data-selling-plan]')) return;
 
@@ -44,34 +46,143 @@
     console.log('✅ Selected plan:', selectedPlan);
   });
 
-  // ================================
-  // 🔥 OVERRIDE FormData (FINAL FIX)
-  // ================================
-  const OriginalFormData = window.FormData;
+  function injectSellingPlan(form) {
+    if (!form) return;
 
-  window.FormData = function (form) {
-    const fd = new OriginalFormData(form);
+    form.querySelector('input[name="selling_plan"]')?.remove();
 
-    // Only modify product form
-    if (form && form.action && form.action.includes('/cart/add')) {
+    if (selectedPlan) {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'selling_plan';
+      input.value = selectedPlan;
 
-      if (selectedPlan) {
-        fd.set('selling_plan', selectedPlan);
-      } else {
-        fd.delete('selling_plan');
+      form.appendChild(input);
+
+      console.log('🚀 Injected selling_plan:', selectedPlan);
+    }
+  }
+
+  // =========================
+  // 🔥 CLICK HOOK (PRIMARY)
+  // =========================
+  document.addEventListener('click', function (e) {
+
+    const btn = e.target.closest('button[name="add"]');
+    if (!btn) return;
+
+    const form = btn.closest('form');
+    if (!form) return;
+
+    injectSellingPlan(form);
+
+  }, true); // ✅ capture phase
+
+  // =========================
+  // 🔥 SUBMIT HOOK (FALLBACK)
+  // =========================
+  document.addEventListener('submit', function (e) {
+
+    const form = e.target;
+    if (!form.matches('form[action*="/cart/add"]')) return;
+
+    injectSellingPlan(form);
+
+  }, true);
+
+  // =========================
+  // 🔥 FETCH INTERCEPT (Dawn AJAX)
+  // =========================
+  const originalFetch = window.fetch;
+
+  window.fetch = function (url, options) {
+
+    if (typeof url === 'string' && url.includes('/cart/add') && options?.body) {
+
+      try {
+
+        if (options.body instanceof FormData) {
+          if (selectedPlan) {
+            options.body.set('selling_plan', selectedPlan);
+          } else {
+            options.body.delete('selling_plan');
+          }
+
+          console.log('🚀 Fetch FormData updated:', selectedPlan);
+        }
+
+        if (typeof options.body === 'string') {
+          const params = new URLSearchParams(options.body);
+
+          if (selectedPlan) {
+            params.set('selling_plan', selectedPlan);
+          } else {
+            params.delete('selling_plan');
+          }
+
+          options.body = params.toString();
+
+          console.log('🚀 Fetch string updated:', selectedPlan);
+        }
+
+      } catch (err) {
+        console.error('Fetch error:', err);
       }
-
-      console.log('🚀 FormData modified:', selectedPlan);
     }
 
-    return fd;
+    return originalFetch.apply(this, arguments);
   };
 
-  window.FormData.prototype = OriginalFormData.prototype;
+  // =========================
+  // 🔥 XHR INTERCEPT (EXTRA SAFE)
+  // =========================
+  const origOpen = XMLHttpRequest.prototype.open;
+  const origSend = XMLHttpRequest.prototype.send;
+
+  XMLHttpRequest.prototype.open = function (method, url) {
+    this._url = url;
+    return origOpen.apply(this, arguments);
+  };
+
+  XMLHttpRequest.prototype.send = function (body) {
+
+    if (this._url && this._url.includes('/cart/add')) {
+      try {
+
+        if (body instanceof FormData) {
+          if (selectedPlan) {
+            body.set('selling_plan', selectedPlan);
+          } else {
+            body.delete('selling_plan');
+          }
+
+          console.log('🚀 XHR FormData updated:', selectedPlan);
+        }
+
+        if (typeof body === 'string') {
+          const params = new URLSearchParams(body);
+
+          if (selectedPlan) {
+            params.set('selling_plan', selectedPlan);
+          } else {
+            params.delete('selling_plan');
+          }
+
+          body = params.toString();
+
+          console.log('🚀 XHR string updated:', selectedPlan);
+        }
+
+      } catch (err) {
+        console.error('XHR error:', err);
+      }
+    }
+
+    return origSend.call(this, body);
+  };
 
 })();
 </script>
-
 {% schema %}
 {
   "name": "Deposit Option",
