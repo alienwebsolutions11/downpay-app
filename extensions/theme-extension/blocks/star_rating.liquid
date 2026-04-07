@@ -31,60 +31,56 @@
   </fieldset>
 {% endif %}
 
-
 <script>
 (function () {
 
-  let selectedPlan = '';
+  function updateSellingPlan(value) {
 
-  // =========================
-  // ✅ TRACK RADIO SELECTION
-  // =========================
+    // get product form
+    const form = document.querySelector('form[action="/cart/add"]');
+    if (!form) return;
+
+    // remove old input
+    const existing = form.querySelector('input[name="selling_plan"]');
+    if (existing) existing.remove();
+
+    // add new if value exists
+    if (value) {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'selling_plan';
+      input.value = value;
+
+      form.appendChild(input);
+
+      console.log('✅ selling_plan added:', value);
+    } else {
+      console.log('❌ selling_plan removed (Pay full)');
+    }
+  }
+
+
   document.addEventListener('change', function (e) {
+
     if (!e.target.matches('[data-selling-plan]')) return;
 
-    selectedPlan = e.target.value;
-    console.log('✅ Selected plan:', selectedPlan);
+    updateSellingPlan(e.target.value);
+
   });
 
-  // =========================
-  // 🔥 INTERCEPT FETCH (MAIN FIX)
-  // =========================
-  const originalFetch = window.fetch;
+ 
+  document.addEventListener('DOMContentLoaded', function () {
 
-  window.fetch = function (url, options) {
+    const checked = document.querySelector('[data-selling-plan]:checked');
 
-    if (
-      typeof url === 'string' &&
-      url.includes('/cart/add') &&
-      options &&
-      options.body
-    ) {
-      try {
-
-        // 🟢 FormData case (Dawn uses this)
-        if (options.body instanceof FormData) {
-
-          if (selectedPlan) {
-            options.body.set('selling_plan', selectedPlan);
-          } else {
-            options.body.delete('selling_plan');
-          }
-
-          console.log('🚀 selling_plan added to FormData:', selectedPlan);
-        }
-
-      } catch (err) {
-        console.error('❌ Fetch error:', err);
-      }
+    if (checked) {
+      updateSellingPlan(checked.value);
     }
 
-    return originalFetch.apply(this, arguments);
-  };
+  });
 
 })();
-</scrip>
-
+</script>
 
 {% schema %}
 {
