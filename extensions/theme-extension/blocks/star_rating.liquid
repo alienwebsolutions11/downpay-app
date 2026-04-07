@@ -33,24 +33,20 @@
 
 <script>
 (function () {
-console.log('jfhdfjdhf');
+
   function getForm() {
-    return document.querySelector('form[action*="/cart/add"]');
+    return document.querySelector('form[action="/cart/add"]');
   }
 
   function updateSellingPlan(value) {
-
     const form = getForm();
-    if (!form) {
-      console.log('❌ Form not found');
-      return;
-    }
+    if (!form) return;
 
-    // remove old
+    //  remove old input
     const existing = form.querySelector('input[name="selling_plan"]');
     if (existing) existing.remove();
 
-    // add new
+    // ✅ add new if value exists
     if (value) {
       const input = document.createElement('input');
       input.type = 'hidden';
@@ -61,52 +57,34 @@ console.log('jfhdfjdhf');
 
       console.log('✅ selling_plan added:', value);
     } else {
-      console.log('❌ selling_plan removed');
+      console.log('🟡 Pay full selected (no selling_plan)');
     }
   }
 
   // =========================
-  // 🔁 HANDLE RADIO CHANGE
+  // 🔥 RADIO CHANGE
   // =========================
   document.addEventListener('change', function (e) {
-
     if (!e.target.matches('[data-selling-plan]')) return;
 
     updateSellingPlan(e.target.value);
-
   });
 
   // =========================
-  // 🔥 HANDLE DYNAMIC LOAD (KEY FIX)
+  // 🔁 DEFAULT (on page load)
   // =========================
-  function init() {
-
+  function initDefault() {
     const checked = document.querySelector('[data-selling-plan]:checked');
-
     if (checked) {
       updateSellingPlan(checked.value);
     }
   }
 
-  // run on load
-  document.addEventListener('DOMContentLoaded', init);
-
-  // run when Shopify reloads section
-  document.addEventListener('shopify:section:load', init);
-
-  // 🔥 EXTRA: watch DOM changes (Dawn replaces form)
-  const observer = new MutationObserver(() => {
-    init();
-  });
-
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true
-  });
+  document.addEventListener('DOMContentLoaded', initDefault);
+  document.addEventListener('shopify:section:load', initDefault);
 
 })();
 </script>
-
 
 {% schema %}
 {
