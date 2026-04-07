@@ -42,11 +42,10 @@
     const form = getForm();
     if (!form) return;
 
-    //  remove old input
+  
     const existing = form.querySelector('input[name="selling_plan"]');
     if (existing) existing.remove();
 
-    // ✅ add new if value exists
     if (value) {
       const input = document.createElement('input');
       input.type = 'hidden';
@@ -55,24 +54,22 @@
 
       form.appendChild(input);
 
-      console.log('✅ selling_plan added:', value);
+      console.log('selling_plan added:', value);
     } else {
-      console.log('🟡 Pay full selected (no selling_plan)');
+      console.log(' Pay full selected (no selling_plan)');
     }
   }
 
-  // =========================
-  // 🔥 RADIO CHANGE
-  // =========================
+  //  RADIO CHANGE
+
   document.addEventListener('change', function (e) {
     if (!e.target.matches('[data-selling-plan]')) return;
 
     updateSellingPlan(e.target.value);
   });
 
-  // =========================
-  // 🔁 DEFAULT (on page load)
-  // =========================
+  // DEFAULT (on page load)
+
   function initDefault() {
     const checked = document.querySelector('[data-selling-plan]:checked');
     if (checked) {
@@ -90,7 +87,7 @@ window.fetch = function (url, options) {
 
     if (hidden && hidden.value) {
       options.body.set('selling_plan', hidden.value);
-      console.log('🚀 selling_plan injected into request:', hidden.value);
+      console.log(' selling_plan injected into request:', hidden.value);
     }
   }
 
