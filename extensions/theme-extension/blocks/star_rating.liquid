@@ -79,7 +79,23 @@
       updateSellingPlan(checked.value);
     }
   }
+// ADD THIS BELOW your script
+const originalFetch = window.fetch;
 
+window.fetch = function (url, options) {
+
+  if (url.includes('/cart/add') && options?.body instanceof FormData) {
+
+    const hidden = document.querySelector('input[name="selling_plan"]');
+
+    if (hidden && hidden.value) {
+      options.body.set('selling_plan', hidden.value);
+      console.log('🚀 selling_plan injected into request:', hidden.value);
+    }
+  }
+
+  return originalFetch.apply(this, arguments);
+};
   document.addEventListener('DOMContentLoaded', initDefault);
   document.addEventListener('shopify:section:load', initDefault);
 
