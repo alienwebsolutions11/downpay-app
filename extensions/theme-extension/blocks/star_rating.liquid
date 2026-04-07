@@ -35,19 +35,18 @@
 
   let selectedPlan = '';
 
-  // =========================
+
   // TRACK RADIO SELECTION
-  // =========================
-  document.addEventListener('change', function (e) {
+    document.addEventListener('change', function (e) {
     if (!e.target.matches('[data-selling-plan]')) return;
 
     selectedPlan = e.target.value;
     console.log('Selected plan:', selectedPlan);
   });
 
-  // =========================
-  // ✅ INJECT INTO FORM
-  // =========================
+
+  // INJECT INTO FORM
+
   function injectSellingPlan(form) {
     if (!form) return;
 
@@ -62,13 +61,13 @@
 
       form.appendChild(input);
 
-      console.log('🚀 Injected selling_plan:', selectedPlan);
+      console.log(' selling_plan:', selectedPlan);
     }
   }
 
-  // =========================
-  // 🔥 CLICK HOOK (MAIN FIX)
-  // =========================
+
+  //  CLICK HOOK 
+ 
   document.addEventListener('click', function (e) {
 
     const btn = e.target.closest('button[name="add"]');
@@ -79,9 +78,9 @@
 
   }, true);
 
-  // =========================
-  // 🔥 SUBMIT HOOK (fallback)
-  // =========================
+
+  //  SUBMIT HOOK
+
   document.addEventListener('submit', function (e) {
 
     const form = e.target;
@@ -91,9 +90,9 @@
 
   }, true);
 
-  // =========================
-  // 🔥 FETCH INTERCEPT (Dawn AJAX)
-  // =========================
+
+  //  FETCH INTERCEPT (Dawn AJAX)
+
   const originalFetch = window.fetch;
 
   window.fetch = function (url, options) {
@@ -109,7 +108,7 @@
             options.body.delete('selling_plan');
           }
 
-          console.log('🚀 Fetch FormData updated:', selectedPlan);
+          console.log('Fetch FormData updated:', selectedPlan);
         }
 
         if (typeof options.body === 'string') {
@@ -123,7 +122,7 @@
 
           options.body = params.toString();
 
-          console.log('🚀 Fetch string updated:', selectedPlan);
+          console.log('Fetch string updated:', selectedPlan);
         }
 
       } catch (err) {
@@ -134,9 +133,9 @@
     return originalFetch.apply(this, arguments);
   };
 
-  // =========================
-  // 🔥 DEFAULT VALUE (IMPORTANT)
-  // =========================
+
+  //  DEFAULT VALUE (IMPORTANT)
+
   function setDefault() {
     const checked = document.querySelector('[data-selling-plan]:checked');
     selectedPlan = checked ? checked.value : '';
@@ -144,9 +143,8 @@
     console.log('🔁 Default plan:', selectedPlan);
   }
 
-  // =========================
-  // 🔁 HANDLE DAWN RELOAD
-  // =========================
+
+
   document.addEventListener('DOMContentLoaded', setDefault);
   document.addEventListener('shopify:section:load', setDefault);
 
