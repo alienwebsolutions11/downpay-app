@@ -38,54 +38,50 @@
 <script>
 (function () {
 
-  // ✅ Get selected plan
-  function getSellingPlan() {
+  function updateSellingPlan(selectedValue) {
+    const form = document.querySelector('product-form form') 
+              || document.querySelector('form[action*="/cart/add"]');
+
+    if (!form) return;
+
+    // remove old input
+    form.querySelector('input[name="selling_plan"]')?.remove();
+
+    // add new if exists
+    if (selectedValue) {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'selling_plan';
+      input.value = selectedValue;
+      form.appendChild(input);
+
+      console.log('✅ selling_plan set:', selectedValue);
+    } else {
+      console.log('💰 Pay full selected');
+    }
+  }
+
+  function bindEvents() {
+    if (window.__spBound) return;
+    window.__spBound = true;
+
+    // ✅ MAIN FIX (this is what worked in your console)
+    document.addEventListener('change', function (e) {
+      if (!e.target.matches('[data-selling-plan]')) return;
+
+      updateSellingPlan(e.target.value);
+    });
+
+    // ✅ Also handle initial load
     const checked = document.querySelector('[data-selling-plan]:checked');
-    return checked ? checked.value : '';
+    if (checked) {
+      updateSellingPlan(checked.value);
+    }
   }
 
-  // ✅ Attach ONE global handler (no duplicates)
-  function bindSellingPlan() {
-    if (window.__spFinalBound) return;
-    window.__spFinalBound = true;
-
-    // 🔥 Runs BEFORE Shopify handles form (MOST IMPORTANT)
-    document.addEventListener('submit', function (e) {
-
-      const form = e.target;
-
-      // only product forms
-      if (!form.matches('form[action*="/cart/add"]')) return;
-
-      const sp = getSellingPlan();
-
-      console.log('🛒 Form submit detected. SP:', sp);
-
-      // remove old
-      form.querySelector('input[name="selling_plan"]')?.remove();
-
-      // add new
-      if (sp) {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'selling_plan';
-        input.value = sp;
-
-        form.appendChild(input);
-
-        console.log('✅ selling_plan added:', sp);
-      } else {
-        console.log('🧹 Pay full selected');
-      }
-
-    }, true); // 🔥 capture = MUST
-
-  }
-
-  // ✅ Init safely
   function init() {
-    bindSellingPlan();
-    console.log('✅ Selling Plan FINAL loaded');
+    bindEvents();
+    console.log('✅ Selling Plan WORKING on all themes');
   }
 
   if (document.readyState === 'loading') {
@@ -94,17 +90,19 @@
     init();
   }
 
+  // ✅ CRITICAL for Dawn / dynamic sections
   document.addEventListener('shopify:section:load', init);
 
 })();
-</script>document.addEventListener('click', function (e) {
+</script>
+document.addEventListener('click', function (e) {
 
   const btn = e.target.closest('button[name="add"]');
   if (!btn) return;
 
   const sp = document.querySelector('[data-selling-plan]:checked')?.value;
 
-  console.log('🛒 Button click SP:', sp);
+  console.log(' Button click SP:', sp);
 
 }, true);
 
