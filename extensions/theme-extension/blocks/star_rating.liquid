@@ -30,126 +30,145 @@
     </label>
   </fieldset>
 {% endif %}
+
 <script>
 (function () {
+  // ── Guard: only run once even if section reloads ──
+  if (window.__depositOptionInit) return;
+  window.__depositOptionInit = true;
 
   let selectedPlan = '';
 
-
-  // TRACK RADIO SELECTION
-    document.addEventListener('change', function (e) {
+  // ── TRACK RADIO SELECTION ──
+  document.addEventListener('change', function (e) {
     if (!e.target.matches('[data-selling-plan]')) return;
-
     selectedPlan = e.target.value;
-    console.log('Selected plan:', selectedPlan);
+    console.log('✅ Selected plan:', selectedPlan);
   });
 
-
-  // INJECT INTO FORM
-
+  // ── INJECT INTO FORM ──
   function injectSellingPlan(form) {
     if (!form) return;
-
-    // remove old
     form.querySelector('input[name="selling_plan"]')?.remove();
-
     if (selectedPlan) {
       const input = document.createElement('input');
       input.type = 'hidden';
       input.name = 'selling_plan';
       input.value = selectedPlan;
-
       form.appendChild(input);
-
-      console.log(' selling_plan:', selectedPlan);
+      console.log('🚀 Injected selling_plan:', selectedPlan);
     }
   }
 
-
-  //  CLICK HOOK 
- 
+  // ── CLICK HOOK ──
   document.addEventListener('click', function (e) {
-
-    const btn = e.target.closest('button[name="add"]');
+    const btn = e.target.closest('button[name="add"], [type="submit"]');
     if (!btn) return;
-
-    const form = btn.closest('form');
+    const form = btn.closest('form[action*="/cart/add"], form[action="/cart/add"]');
+    if (!form) return;
     injectSellingPlan(form);
-
   }, true);
 
-
-  //  SUBMIT HOOK
-
+  // ── SUBMIT HOOK ──
   document.addEventListener('submit', function (e) {
-
     const form = e.target;
-    if (!form.matches('form[action*="/cart/add"]')) return;
-
+    if (!form.action || !form.action.includes('/cart/add')) return;
     injectSellingPlan(form);
-
   }, true);
 
-
-  //  FETCH INTERCEPT (Dawn AJAX)
-
+  // ── FETCH INTERCEPT ──
   const originalFetch = window.fetch;
-
   window.fetch = function (url, options) {
-
-    if (typeof url === 'string' && url.includes('/cart/add') && options?.body) {
-
+    const urlStr = typeof url === 'string' ? url : (url?.url || '');
+    if (urlStr.includes('/cart/add') && options?.body) {
       try {
-
         if (options.body instanceof FormData) {
           if (selectedPlan) {
             options.body.set('selling_plan', selectedPlan);
           } else {
             options.body.delete('selling_plan');
           }
-
-          console.log('Fetch FormData updated:', selectedPlan);
-        }
-
-        if (typeof options.body === 'string') {
+          console.log('🚀 Fetch FormData updated:', selectedPlan);
+        } else if (typeof options.body === 'string') {
           const params = new URLSearchParams(options.body);
-
           if (selectedPlan) {
             params.set('selling_plan', selectedPlan);
           } else {
             params.delete('selling_plan');
           }
-
           options.body = params.toString();
-
-          console.log('Fetch string updated:', selectedPlan);
+          console.log('🚀 Fetch string updated:', selectedPlan);
+        } else if (options.body instanceof URLSearchParams) {
+          // Some themes pass URLSearchParams directly
+          if (selectedPlan) {
+            options.body.set('selling_plan', selectedPlan);
+          } else {
+            options.body.delete('selling_plan');
+          }
+          console.log('🚀 Fetch URLSearchParams updated:', selectedPlan);
         }
-
       } catch (err) {
-        console.error('Fetch error:', err);
+        console.error('Fetch intercept error:', err);
       }
     }
-
     return originalFetch.apply(this, arguments);
   };
 
+  // ── XHR INTERCEPT (some older/custom themes use XHR) ──
+  const originalOpen = XMLHttpRequest.prototype.open;
+  const originalSend = XMLHttpRequest.prototype.send;
 
-  //  DEFAULT VALUE (IMPORTANT)
+  XMLHttpRequest.prototype.open = function (method, url) {
+    this._url = url;
+    return originalOpen.apply(this, arguments);
+  };
 
+  XMLHttpRequest.prototype.send = function (body) {
+    if (this._url && this._url.includes('/cart/add') && body) {
+      try {
+        if (typeof body === 'string') {
+          const params = new URLSearchParams(body);
+          if (selectedPlan) {
+            params.set('selling_plan', selectedPlan);
+          } else {
+            params.delete('selling_plan');
+          }
+          body = params.toString();
+          console.log('🚀 XHR body updated:', selectedPlan);
+        }
+      } catch (err) {
+        console.error('XHR intercept error:', err);
+      }
+    }
+    return originalSend.call(this, body);
+  };
+
+  // ── SET DEFAULT ──
+  // KEY FIX: Use setTimeout to ensure DOM is ready
+  // regardless of when this script tag executes
   function setDefault() {
     const checked = document.querySelector('[data-selling-plan]:checked');
     selectedPlan = checked ? checked.value : '';
-
-    console.log('🔁 Default plan:', selectedPlan);
+    console.log('🔁 Default plan set:', selectedPlan);
   }
 
+  // Run immediately (script is inline, DOM above it already exists)
+  setDefault();
 
+  // Also cover cases where DOMContentLoaded hasn't fired yet
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setDefault);
+  }
 
-  document.addEventListener('DOMContentLoaded', setDefault);
-  document.addEventListener('shopify:section:load', setDefault);
+  // Shopify section events (theme editor)
+  document.addEventListener('shopify:section:load', function () {
+    window.__depositOptionInit = false; // allow re-init on section reload
+    setDefault();
+  });
 
 })();
 </script>
+
 {% schema %}
 {
   "name": "Deposit Option",
