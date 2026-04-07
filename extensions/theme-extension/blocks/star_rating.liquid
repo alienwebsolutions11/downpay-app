@@ -5,10 +5,13 @@
     cursor: pointer;
   }
 </style>
+
 {% assign first_plan = product.selling_plan_groups.first.selling_plans.first %}
+
 {% if first_plan %}
   <fieldset class="selling-plan-fieldset">
     <legend>Choose payment option</legend>
+
     <label class="options_purchase_radio_btn">
       <input type="radio"
              name="selling_plan_option"
@@ -16,6 +19,7 @@
              data-selling-plan>
       Deposit
     </label>
+
     <label class="options_purchase_radio_btn">
       <input type="radio"
              name="selling_plan_option"
@@ -26,107 +30,125 @@
     </label>
   </fieldset>
 {% endif %}
-
 <script>
 (function () {
+
   let selectedPlan = '';
 
-  // Update the hidden input in ALL product forms (works across themes)
-  function updateProductForms() {
-    const forms = document.querySelectorAll('form[action*="/cart/add"], form[data-product-form]');
-    forms.forEach(form => {
-      let input = form.querySelector('input[name="selling_plan"]');
-      
-      if (selectedPlan) {
-        if (!input) {
-          input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = 'selling_plan';
-          form.appendChild(input);
-        }
-        input.value = selectedPlan;
-      } else if (input) {
-        input.remove();
-      }
-    });
-  }
-
-  // Radio change handler
-  function handlePlanChange(e) {
+  document.addEventListener('change', function (e) {
     if (!e.target.matches('[data-selling-plan]')) return;
+
     selectedPlan = e.target.value;
-    updateProductForms();
-    console.log('Selected plan updated:', selectedPlan);
+    console.log(' Selected plan:', selectedPlan);
+  });
+
+
+  //  INJECT INTO FORM
+
+  function injectSellingPlan(form) {
+    if (!form) return;
+
+    // remove old
+    form.querySelector('input[name="selling_plan"]')?.remove();
+
+    if (selectedPlan) {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'selling_plan';
+      input.value = selectedPlan;
+
+      form.appendChild(input);
+
+      console.log('Injected selling_plan:', selectedPlan);
+    }
   }
 
-  // Default on load / section reload
-  function setDefault() {
-    const checked = document.querySelector('[data-selling-plan]:checked');
-    selectedPlan = checked ? checked.value : '';
-    updateProductForms();
-    console.log('Default plan set:', selectedPlan);
-  }
 
-  // === Event listeners ===
-  document.addEventListener('change', handlePlanChange);
+  //  CLICK HOOK (MAIN FIX)
 
-  // Fetch override (safety net for any AJAX that bypasses the form)
+  document.addEventListener('click', function (e) {
+
+    const btn = e.target.closest('button[name="add"]');
+    if (!btn) return;
+
+    const form = btn.closest('form');
+    injectSellingPlan(form);
+
+  }, true);
+
+
+  // SUBMIT HOOK (fallback)
+
+  document.addEventListener('submit', function (e) {
+
+    const form = e.target;
+    if (!form.matches('form[action*="/cart/add"]')) return;
+
+    injectSellingPlan(form);
+
+  }, true);
+
+
+  // FETCH INTERCEPT (Dawn AJAX)
+
   const originalFetch = window.fetch;
+
   window.fetch = function (url, options) {
+
     if (typeof url === 'string' && url.includes('/cart/add') && options?.body) {
+
       try {
+
         if (options.body instanceof FormData) {
           if (selectedPlan) {
             options.body.set('selling_plan', selectedPlan);
           } else {
             options.body.delete('selling_plan');
           }
+
           console.log('Fetch FormData updated:', selectedPlan);
-        } else if (typeof options.body === 'string') {
-          // Handle rare JSON bodies (some quick-adds)
-          if (options.body.trim().startsWith('{')) {
-            try {
-              const bodyObj = JSON.parse(options.body);
-              if (selectedPlan) {
-                if (bodyObj.items && bodyObj.items[0]) {
-                  bodyObj.items[0].selling_plan = selectedPlan;
-                } else {
-                  bodyObj.selling_plan = selectedPlan;
-                }
-              } else {
-                if (bodyObj.items && bodyObj.items[0]) delete bodyObj.items[0].selling_plan;
-                else delete bodyObj.selling_plan;
-              }
-              options.body = JSON.stringify(bodyObj);
-              console.log('Fetch JSON body updated');
-            } catch (e) {}
-          } else {
-            const params = new URLSearchParams(options.body);
-            if (selectedPlan) params.set('selling_plan', selectedPlan);
-            else params.delete('selling_plan');
-            options.body = params.toString();
-          }
         }
+
+        if (typeof options.body === 'string') {
+          const params = new URLSearchParams(options.body);
+
+          if (selectedPlan) {
+            params.set('selling_plan', selectedPlan);
+          } else {
+            params.delete('selling_plan');
+          }
+
+          options.body = params.toString();
+
+          console.log(' Fetch string updated:', selectedPlan);
+        }
+
       } catch (err) {
-        console.error('Fetch override error:', err);
+        console.error('Fetch error:', err);
       }
     }
+
     return originalFetch.apply(this, arguments);
   };
 
-  // Initialize
+
+  //  DEFAULT VALUE (IMPORTANT)
+
+  function setDefault() {
+    const checked = document.querySelector('[data-selling-plan]:checked');
+    selectedPlan = checked ? checked.value : '';
+
+    console.log('Default plan:', selectedPlan);
+  }
+
+
+  // 🔁 HANDLE DAWN RELOAD
+
   document.addEventListener('DOMContentLoaded', setDefault);
   document.addEventListener('shopify:section:load', setDefault);
 
-  // Re-init after variant changes (some themes re-render the form)
-  document.addEventListener('change', function (e) {
-    if (e.target.matches('[name="id"], [name="variant-id"], select[name="id"]')) {
-      setTimeout(updateProductForms, 50); // small delay for themes that swap form content
-    }
-  });
 })();
 </script>
-
 {% schema %}
 {
   "name": "Deposit Option",
