@@ -35,7 +35,9 @@
 
   let selectedPlan = '';
 
-  // ✅ Track radio
+  // =========================
+  // ✅ TRACK RADIO SELECTION
+  // =========================
   document.addEventListener('change', function (e) {
     if (!e.target.matches('[data-selling-plan]')) return;
 
@@ -43,69 +45,110 @@
     console.log('✅ Selected plan:', selectedPlan);
   });
 
-  // ✅ Set default
+  // =========================
+  // ✅ INJECT INTO FORM
+  // =========================
+  function injectSellingPlan(form) {
+    if (!form) return;
+
+    // remove old
+    form.querySelector('input[name="selling_plan"]')?.remove();
+
+    if (selectedPlan) {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'selling_plan';
+      input.value = selectedPlan;
+
+      form.appendChild(input);
+
+      console.log('🚀 Injected selling_plan:', selectedPlan);
+    }
+  }
+
+  // =========================
+  // 🔥 CLICK HOOK (MAIN FIX)
+  // =========================
+  document.addEventListener('click', function (e) {
+
+    const btn = e.target.closest('button[name="add"]');
+    if (!btn) return;
+
+    const form = btn.closest('form');
+    injectSellingPlan(form);
+
+  }, true);
+
+  // =========================
+  // 🔥 SUBMIT HOOK (fallback)
+  // =========================
+  document.addEventListener('submit', function (e) {
+
+    const form = e.target;
+    if (!form.matches('form[action*="/cart/add"]')) return;
+
+    injectSellingPlan(form);
+
+  }, true);
+
+  // =========================
+  // 🔥 FETCH INTERCEPT (Dawn AJAX)
+  // =========================
+  const originalFetch = window.fetch;
+
+  window.fetch = function (url, options) {
+
+    if (typeof url === 'string' && url.includes('/cart/add') && options?.body) {
+
+      try {
+
+        if (options.body instanceof FormData) {
+          if (selectedPlan) {
+            options.body.set('selling_plan', selectedPlan);
+          } else {
+            options.body.delete('selling_plan');
+          }
+
+          console.log('🚀 Fetch FormData updated:', selectedPlan);
+        }
+
+        if (typeof options.body === 'string') {
+          const params = new URLSearchParams(options.body);
+
+          if (selectedPlan) {
+            params.set('selling_plan', selectedPlan);
+          } else {
+            params.delete('selling_plan');
+          }
+
+          options.body = params.toString();
+
+          console.log('🚀 Fetch string updated:', selectedPlan);
+        }
+
+      } catch (err) {
+        console.error('Fetch error:', err);
+      }
+    }
+
+    return originalFetch.apply(this, arguments);
+  };
+
+  // =========================
+  // 🔥 DEFAULT VALUE (IMPORTANT)
+  // =========================
   function setDefault() {
     const checked = document.querySelector('[data-selling-plan]:checked');
     selectedPlan = checked ? checked.value : '';
-    console.log('🔁 Default:', selectedPlan);
+
+    console.log('🔁 Default plan:', selectedPlan);
   }
 
+  // =========================
+  // 🔁 HANDLE DAWN RELOAD
+  // =========================
   document.addEventListener('DOMContentLoaded', setDefault);
   document.addEventListener('shopify:section:load', setDefault);
-
-  // ============================================
-  // 🔥 MAIN FIX: PATCH Dawn product-form submit
-  // ============================================
-
-  function patchProductForm() {
-
-    const productForms = document.querySelectorAll('product-form');
-
-    productForms.forEach((pf) => {
-
-      if (pf.__patched) return;
-      pf.__patched = true;
-
-      const originalSubmit = pf.onSubmitHandler;
-
-      pf.onSubmitHandler = function (evt) {
-
-        console.log('🚀 Dawn submit intercepted');
-
-        const formData = new FormData(this.form);
-
-        if (selectedPlan) {
-          formData.set('selling_plan', selectedPlan);
-        } else {
-          formData.delete('selling_plan');
-        }
-
-        console.log('✅ Injected into FormData:', selectedPlan);
-
-        // 🔥 Replace request
-        fetch('/cart/add.js', {
-          method: 'POST',
-          body: formData,
-          headers: { 'Accept': 'application/json' }
-        })
-        .then(res => res.json())
-        .then(data => {
-          console.log('✅ Added to cart:', data);
-
-          // optional: trigger cart update
-          document.dispatchEvent(new CustomEvent('cart:refresh'));
-        })
-        .catch(err => console.error(err));
-
-        evt.preventDefault(); // 🚨 STOP Dawn default
-      };
-
-    });
-  }
-
-  // run multiple times (Dawn reloads DOM)
-  document.addEventListener('DOMContentLoaded', patchProductForm);
-  document.addEventListener('shopify:section:load', patchProductForm);
 
 })();
 </script>
