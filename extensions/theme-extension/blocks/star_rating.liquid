@@ -38,50 +38,60 @@
 <script>
 (function () {
 
-  function updateSellingPlan(selectedValue) {
-    const form = document.querySelector('product-form form') 
-              || document.querySelector('form[action*="/cart/add"]');
+  function updateSellingPlan(value) {
+    const forms = document.querySelectorAll('form[action*="/cart/add"]');
 
-    if (!form) return;
+    forms.forEach((form) => {
+      form.querySelector('input[name="selling_plan"]')?.remove();
 
-    // remove old input
-    form.querySelector('input[name="selling_plan"]')?.remove();
+      if (value) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'selling_plan';
+        input.value = value;
+        form.appendChild(input);
 
-    // add new if exists
-    if (selectedValue) {
-      const input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = 'selling_plan';
-      input.value = selectedValue;
-      form.appendChild(input);
-
-      console.log('✅ selling_plan set:', selectedValue);
-    } else {
-      console.log('💰 Pay full selected');
-    }
+        console.log('✅ selling_plan added:', value);
+      }
+    });
   }
 
-  function bindEvents() {
-    if (window.__spBound) return;
-    window.__spBound = true;
+  function bindRadios() {
+    const radios = document.querySelectorAll('[data-selling-plan]');
 
-    // ✅ MAIN FIX (this is what worked in your console)
-    document.addEventListener('change', function (e) {
-      if (!e.target.matches('[data-selling-plan]')) return;
+    radios.forEach((radio) => {
+      if (radio.__bound) return;
 
-      updateSellingPlan(e.target.value);
+      radio.__bound = true;
+
+      radio.addEventListener('change', function () {
+        console.log('🔁 Radio changed:', this.value);
+        updateSellingPlan(this.value);
+      });
     });
 
-    // ✅ Also handle initial load
+    // run once for default checked
     const checked = document.querySelector('[data-selling-plan]:checked');
     if (checked) {
       updateSellingPlan(checked.value);
     }
   }
 
+  function observeDOM() {
+    const observer = new MutationObserver(() => {
+      bindRadios();
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  }
+
   function init() {
-    bindEvents();
-    console.log('✅ Selling Plan WORKING on all themes');
+    bindRadios();
+    observeDOM();
+    console.log('🚀 Selling Plan FIXED (Dawn safe)');
   }
 
   if (document.readyState === 'loading') {
@@ -89,9 +99,6 @@
   } else {
     init();
   }
-
-  // ✅ CRITICAL for Dawn / dynamic sections
-  document.addEventListener('shopify:section:load', init);
 
 })();
 </script>
