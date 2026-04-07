@@ -45,100 +45,29 @@
   });
 
   // ================================
-  // 🔥 FETCH INTERCEPT (Dawn main)
+  // 🔥 OVERRIDE FormData (FINAL FIX)
   // ================================
-  const originalFetch = window.fetch;
+  const OriginalFormData = window.FormData;
 
-  window.fetch = async function (...args) {
-    let [url, options] = args;
+  window.FormData = function (form) {
+    const fd = new OriginalFormData(form);
 
-    if (typeof url === 'string' && url.includes('/cart/add')) {
+    // Only modify product form
+    if (form && form.action && form.action.includes('/cart/add')) {
 
-      if (options?.body) {
-        try {
-
-          // FormData case
-          if (options.body instanceof FormData) {
-            if (selectedPlan) {
-              options.body.set('selling_plan', selectedPlan);
-            } else {
-              options.body.delete('selling_plan');
-            }
-
-            console.log('🚀 Injected into FormData:', selectedPlan);
-          }
-
-          // String case
-          if (typeof options.body === 'string') {
-            const params = new URLSearchParams(options.body);
-
-            if (selectedPlan) {
-              params.set('selling_plan', selectedPlan);
-            } else {
-              params.delete('selling_plan');
-            }
-
-            options.body = params.toString();
-
-            console.log('🚀 Injected into request string:', selectedPlan);
-          }
-
-        } catch (err) {
-          console.error('Fetch inject error:', err);
-        }
+      if (selectedPlan) {
+        fd.set('selling_plan', selectedPlan);
+      } else {
+        fd.delete('selling_plan');
       }
+
+      console.log('🚀 FormData modified:', selectedPlan);
     }
 
-    return originalFetch.apply(this, args);
+    return fd;
   };
 
-  // ================================
-  // 🔥 XHR INTERCEPT (fallback)
-  // ================================
-  const origOpen = XMLHttpRequest.prototype.open;
-  const origSend = XMLHttpRequest.prototype.send;
-
-  XMLHttpRequest.prototype.open = function (method, url) {
-    this._url = url;
-    return origOpen.apply(this, arguments);
-  };
-
-  XMLHttpRequest.prototype.send = function (body) {
-
-    if (this._url && this._url.includes('/cart/add')) {
-      try {
-
-        if (body instanceof FormData) {
-          if (selectedPlan) {
-            body.set('selling_plan', selectedPlan);
-          } else {
-            body.delete('selling_plan');
-          }
-
-          console.log('🚀 XHR FormData injected:', selectedPlan);
-        }
-
-        if (typeof body === 'string') {
-          const params = new URLSearchParams(body);
-
-          if (selectedPlan) {
-            params.set('selling_plan', selectedPlan);
-          } else {
-            params.delete('selling_plan');
-          }
-
-          body = params.toString();
-
-          console.log('🚀 XHR string injected:', selectedPlan);
-        }
-
-      } catch (err) {
-        console.error('XHR inject error:', err);
-      }
-    }
-
-    return origSend.call(this, body);
-  };
+  window.FormData.prototype = OriginalFormData.prototype;
 
 })();
 </script>
