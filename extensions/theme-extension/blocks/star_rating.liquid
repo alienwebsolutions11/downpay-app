@@ -40,7 +40,7 @@
 
   let selectedPlan = '';
 
-  // track radio change
+  // track selection
   document.addEventListener('change', function (e) {
     if (!e.target.matches('[data-selling-plan]')) return;
 
@@ -48,49 +48,30 @@
     console.log('✅ Selected plan:', selectedPlan);
   });
 
-  // intercept Shopify AJAX request
-  const originalFetch = window.fetch;
+  // 🔥 CRITICAL: Hook into form BEFORE submission
+  document.addEventListener('submit', function (e) {
 
-  window.fetch = function (url, options) {
+    const form = e.target;
 
-    if (url.includes('/cart/add') && options?.body) {
+    if (!form.matches('form[action*="/cart/add"]')) return;
 
-      try {
-        let body;
+    console.log('🚀 Form submit intercepted');
 
-        if (options.body instanceof FormData) {
-          body = options.body;
+    // remove old
+    form.querySelector('input[name="selling_plan"]')?.remove();
 
-          if (selectedPlan) {
-            body.set('selling_plan', selectedPlan);
-          } else {
-            body.delete('selling_plan');
-          }
+    if (selectedPlan) {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'selling_plan';
+      input.value = selectedPlan;
 
-          console.log('🚀 Injected selling_plan into FormData:', selectedPlan);
-        }
+      form.appendChild(input);
 
-        if (typeof options.body === 'string') {
-          const params = new URLSearchParams(options.body);
-
-          if (selectedPlan) {
-            params.set('selling_plan', selectedPlan);
-          } else {
-            params.delete('selling_plan');
-          }
-
-          options.body = params.toString();
-
-          console.log('🚀 Injected selling_plan into request string:', selectedPlan);
-        }
-
-      } catch (err) {
-        console.log('Error injecting selling_plan', err);
-      }
+      console.log('✅ selling_plan appended BEFORE submit:', selectedPlan);
     }
 
-    return originalFetch(url, options);
-  };
+  }, true); // ✅ capture phase = VERY IMPORTANT
 
 })();
 </script>
