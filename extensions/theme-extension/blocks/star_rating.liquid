@@ -36,13 +36,13 @@
   let selectedPlan = '';
 
   // =========================
-  // ✅ TRACK RADIO SELECTION
+  // TRACK RADIO SELECTION
   // =========================
   document.addEventListener('change', function (e) {
     if (!e.target.matches('[data-selling-plan]')) return;
 
     selectedPlan = e.target.value;
-    console.log('✅ Selected plan:', selectedPlan);
+    console.log('Selected plan:', selectedPlan);
   });
 
   // =========================
