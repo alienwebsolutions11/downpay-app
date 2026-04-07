@@ -12,19 +12,21 @@
   <fieldset class="selling-plan-fieldset">
     <legend>Choose payment option</legend>
 
-    <!-- ✅ Deposit option -->
+    <!-- ✅ Deposit -->
     <label class="options_purchase_radio_btn">
       <input type="radio"
-             name="selling_plan"
-             value="{{ first_plan.id }}">
+             name="selling_plan_option"
+             value="{{ first_plan.id }}"
+             data-selling-plan>
       Deposit
     </label>
 
     <!-- ✅ Pay full -->
     <label class="options_purchase_radio_btn">
       <input type="radio"
-             name="selling_plan"
+             name="selling_plan_option"
              value=""
+             data-selling-plan
              checked>
       Pay full
     </label>
@@ -46,9 +48,13 @@
     console.log('✅ Selected plan:', selectedPlan);
   });
 
+  // =========================
+  // ✅ INJECT INTO FORM
+  // =========================
   function injectSellingPlan(form) {
     if (!form) return;
 
+    // remove old
     form.querySelector('input[name="selling_plan"]')?.remove();
 
     if (selectedPlan) {
@@ -64,7 +70,7 @@
   }
 
   // =========================
-  // 🔥 CLICK HOOK (PRIMARY)
+  // 🔥 CLICK HOOK (MAIN FIX)
   // =========================
   document.addEventListener('click', function (e) {
 
@@ -72,14 +78,12 @@
     if (!btn) return;
 
     const form = btn.closest('form');
-    if (!form) return;
-
     injectSellingPlan(form);
 
-  }, true); // ✅ capture phase
+  }, true);
 
   // =========================
-  // 🔥 SUBMIT HOOK (FALLBACK)
+  // 🔥 SUBMIT HOOK (fallback)
   // =========================
   document.addEventListener('submit', function (e) {
 
@@ -134,52 +138,20 @@
   };
 
   // =========================
-  // 🔥 XHR INTERCEPT (EXTRA SAFE)
+  // 🔥 DEFAULT VALUE (IMPORTANT)
   // =========================
-  const origOpen = XMLHttpRequest.prototype.open;
-  const origSend = XMLHttpRequest.prototype.send;
+  function setDefault() {
+    const checked = document.querySelector('[data-selling-plan]:checked');
+    selectedPlan = checked ? checked.value : '';
 
-  XMLHttpRequest.prototype.open = function (method, url) {
-    this._url = url;
-    return origOpen.apply(this, arguments);
-  };
+    console.log('🔁 Default plan:', selectedPlan);
+  }
 
-  XMLHttpRequest.prototype.send = function (body) {
-
-    if (this._url && this._url.includes('/cart/add')) {
-      try {
-
-        if (body instanceof FormData) {
-          if (selectedPlan) {
-            body.set('selling_plan', selectedPlan);
-          } else {
-            body.delete('selling_plan');
-          }
-
-          console.log('🚀 XHR FormData updated:', selectedPlan);
-        }
-
-        if (typeof body === 'string') {
-          const params = new URLSearchParams(body);
-
-          if (selectedPlan) {
-            params.set('selling_plan', selectedPlan);
-          } else {
-            params.delete('selling_plan');
-          }
-
-          body = params.toString();
-
-          console.log('🚀 XHR string updated:', selectedPlan);
-        }
-
-      } catch (err) {
-        console.error('XHR error:', err);
-      }
-    }
-
-    return origSend.call(this, body);
-  };
+  // =========================
+  // 🔁 HANDLE DAWN RELOAD
+  // =========================
+  document.addEventListener('DOMContentLoaded', setDefault);
+  document.addEventListener('shopify:section:load', setDefault);
 
 })();
 </script>
