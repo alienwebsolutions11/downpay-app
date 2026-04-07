@@ -36,7 +36,7 @@
 
   let selectedPlan = '';
 
-  // track selection
+  // ✅ Track radio selection
   document.addEventListener('change', function (e) {
     if (!e.target.matches('[data-selling-plan]')) return;
 
@@ -44,30 +44,101 @@
     console.log('✅ Selected plan:', selectedPlan);
   });
 
-  // 🔥 CRITICAL: Hook into form BEFORE submission
-  document.addEventListener('submit', function (e) {
+  // ================================
+  // 🔥 FETCH INTERCEPT (Dawn main)
+  // ================================
+  const originalFetch = window.fetch;
 
-    const form = e.target;
+  window.fetch = async function (...args) {
+    let [url, options] = args;
 
-    if (!form.matches('form[action*="/cart/add"]')) return;
+    if (typeof url === 'string' && url.includes('/cart/add')) {
 
-    console.log('🚀 Form submit intercepted');
+      if (options?.body) {
+        try {
 
-    // remove old
-    form.querySelector('input[name="selling_plan"]')?.remove();
+          // FormData case
+          if (options.body instanceof FormData) {
+            if (selectedPlan) {
+              options.body.set('selling_plan', selectedPlan);
+            } else {
+              options.body.delete('selling_plan');
+            }
 
-    if (selectedPlan) {
-      const input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = 'selling_plan';
-      input.value = selectedPlan;
+            console.log('🚀 Injected into FormData:', selectedPlan);
+          }
 
-      form.appendChild(input);
+          // String case
+          if (typeof options.body === 'string') {
+            const params = new URLSearchParams(options.body);
 
-      console.log('✅ selling_plan appended BEFORE submit:', selectedPlan);
+            if (selectedPlan) {
+              params.set('selling_plan', selectedPlan);
+            } else {
+              params.delete('selling_plan');
+            }
+
+            options.body = params.toString();
+
+            console.log('🚀 Injected into request string:', selectedPlan);
+          }
+
+        } catch (err) {
+          console.error('Fetch inject error:', err);
+        }
+      }
     }
 
-  }, true); // ✅ capture phase = VERY IMPORTANT
+    return originalFetch.apply(this, args);
+  };
+
+  // ================================
+  // 🔥 XHR INTERCEPT (fallback)
+  // ================================
+  const origOpen = XMLHttpRequest.prototype.open;
+  const origSend = XMLHttpRequest.prototype.send;
+
+  XMLHttpRequest.prototype.open = function (method, url) {
+    this._url = url;
+    return origOpen.apply(this, arguments);
+  };
+
+  XMLHttpRequest.prototype.send = function (body) {
+
+    if (this._url && this._url.includes('/cart/add')) {
+      try {
+
+        if (body instanceof FormData) {
+          if (selectedPlan) {
+            body.set('selling_plan', selectedPlan);
+          } else {
+            body.delete('selling_plan');
+          }
+
+          console.log('🚀 XHR FormData injected:', selectedPlan);
+        }
+
+        if (typeof body === 'string') {
+          const params = new URLSearchParams(body);
+
+          if (selectedPlan) {
+            params.set('selling_plan', selectedPlan);
+          } else {
+            params.delete('selling_plan');
+          }
+
+          body = params.toString();
+
+          console.log('🚀 XHR string injected:', selectedPlan);
+        }
+
+      } catch (err) {
+        console.error('XHR inject error:', err);
+      }
+    }
+
+    return origSend.call(this, body);
+  };
 
 })();
 </script>
