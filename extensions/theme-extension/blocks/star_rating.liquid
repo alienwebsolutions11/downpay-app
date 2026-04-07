@@ -6,34 +6,30 @@
   }
 </style>
 
-<script>
-  window.productData = {{ product | json }};
-</script>
+{% assign first_plan = product.selling_plan_groups.first.selling_plans.first %}
 
-<fieldset data-selling-plan-wrapper>
-  <legend>Choose payment option</legend>
+{% if first_plan %}
+  <fieldset class="selling-plan-fieldset">
+    <legend>Choose payment option</legend>
 
-  {% assign first_plan = product.selling_plan_groups.first.selling_plans.first %}
-  
-  {% if first_plan %}
+    <!-- ✅ Deposit option -->
     <label class="options_purchase_radio_btn">
       <input type="radio"
-             name="selling_plan_option"
-             value="{{ first_plan.id }}"
-             data-selling-plan>
+             name="selling_plan"
+             value="{{ first_plan.id }}">
       Deposit
     </label>
-  {% endif %}
 
-  <label class="options_purchase_radio_btn">
-    <input type="radio"
-           name="selling_plan_option"
-           value=""
-           data-selling-plan
-           checked>
-    Pay full
-  </label>
-</fieldset>
+    <!-- ✅ Pay full -->
+    <label class="options_purchase_radio_btn">
+      <input type="radio"
+             name="selling_plan"
+             value=""
+             checked>
+      Pay full
+    </label>
+  </fieldset>
+{% endif %}
 
 <script>
 (function () {
