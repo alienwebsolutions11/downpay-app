@@ -38,80 +38,62 @@
 <script>
 (function () {
 
-  function updateSellingPlan(value) {
-    const forms = document.querySelectorAll('form[action*="/cart/add"]');
+  let selectedPlan = '';
 
-    forms.forEach((form) => {
-      form.querySelector('input[name="selling_plan"]')?.remove();
+  // track radio change
+  document.addEventListener('change', function (e) {
+    if (!e.target.matches('[data-selling-plan]')) return;
 
-      if (value) {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'selling_plan';
-        input.value = value;
-        form.appendChild(input);
+    selectedPlan = e.target.value;
+    console.log('✅ Selected plan:', selectedPlan);
+  });
 
-        console.log('✅ selling_plan added:', value);
+  // intercept Shopify AJAX request
+  const originalFetch = window.fetch;
+
+  window.fetch = function (url, options) {
+
+    if (url.includes('/cart/add') && options?.body) {
+
+      try {
+        let body;
+
+        if (options.body instanceof FormData) {
+          body = options.body;
+
+          if (selectedPlan) {
+            body.set('selling_plan', selectedPlan);
+          } else {
+            body.delete('selling_plan');
+          }
+
+          console.log('🚀 Injected selling_plan into FormData:', selectedPlan);
+        }
+
+        if (typeof options.body === 'string') {
+          const params = new URLSearchParams(options.body);
+
+          if (selectedPlan) {
+            params.set('selling_plan', selectedPlan);
+          } else {
+            params.delete('selling_plan');
+          }
+
+          options.body = params.toString();
+
+          console.log('🚀 Injected selling_plan into request string:', selectedPlan);
+        }
+
+      } catch (err) {
+        console.log('Error injecting selling_plan', err);
       }
-    });
-  }
-
-  function bindRadios() {
-    const radios = document.querySelectorAll('[data-selling-plan]');
-
-    radios.forEach((radio) => {
-      if (radio.__bound) return;
-
-      radio.__bound = true;
-
-      radio.addEventListener('change', function () {
-        console.log('🔁 Radio changed:', this.value);
-        updateSellingPlan(this.value);
-      });
-    });
-
-    // run once for default checked
-    const checked = document.querySelector('[data-selling-plan]:checked');
-    if (checked) {
-      updateSellingPlan(checked.value);
     }
-  }
 
-  function observeDOM() {
-    const observer = new MutationObserver(() => {
-      bindRadios();
-    });
-
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-  }
-
-  function init() {
-    bindRadios();
-    observeDOM();
-    console.log('🚀 Selling Plan FIXED (Dawn safe)');
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
+    return originalFetch(url, options);
+  };
 
 })();
 </script>
-document.addEventListener('click', function (e) {
-
-  const btn = e.target.closest('button[name="add"]');
-  if (!btn) return;
-
-  const sp = document.querySelector('[data-selling-plan]:checked')?.value;
-
-  console.log(' Button click SP:', sp);
-
-}, true);
 
 {% schema %}
 {
