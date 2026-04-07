@@ -33,18 +33,24 @@
 
 <script>
 (function () {
+console.log('jfhdfjdhf');
+  function getForm() {
+    return document.querySelector('form[action*="/cart/add"]');
+  }
 
   function updateSellingPlan(value) {
 
-    // get product form
-    const form = document.querySelector('form[action="/cart/add"]');
-    if (!form) return;
+    const form = getForm();
+    if (!form) {
+      console.log('❌ Form not found');
+      return;
+    }
 
-    // remove old input
+    // remove old
     const existing = form.querySelector('input[name="selling_plan"]');
     if (existing) existing.remove();
 
-    // add new if value exists
+    // add new
     if (value) {
       const input = document.createElement('input');
       input.type = 'hidden';
@@ -55,11 +61,13 @@
 
       console.log('✅ selling_plan added:', value);
     } else {
-      console.log(' selling_plan removed (Pay full)');
+      console.log('❌ selling_plan removed');
     }
   }
 
-
+  // =========================
+  // 🔁 HANDLE RADIO CHANGE
+  // =========================
   document.addEventListener('change', function (e) {
 
     if (!e.target.matches('[data-selling-plan]')) return;
@@ -68,19 +76,37 @@
 
   });
 
- 
-  document.addEventListener('DOMContentLoaded', function () {
+  // =========================
+  // 🔥 HANDLE DYNAMIC LOAD (KEY FIX)
+  // =========================
+  function init() {
 
     const checked = document.querySelector('[data-selling-plan]:checked');
 
     if (checked) {
       updateSellingPlan(checked.value);
     }
+  }
 
+  // run on load
+  document.addEventListener('DOMContentLoaded', init);
+
+  // run when Shopify reloads section
+  document.addEventListener('shopify:section:load', init);
+
+  // 🔥 EXTRA: watch DOM changes (Dawn replaces form)
+  const observer = new MutationObserver(() => {
+    init();
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
   });
 
 })();
 </script>
+
 
 {% schema %}
 {
