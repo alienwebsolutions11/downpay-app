@@ -14,6 +14,7 @@
 
     <label class="options_purchase_radio_btn">
       <input type="radio"
+        onchange="checkSelling(this);"
              name="selling_plan_option"
              value="{{ first_plan.id }}"
              data-selling-plan>
@@ -22,6 +23,7 @@
 
     <label class="options_purchase_radio_btn">
       <input type="radio"
+      onchange="checkSelling(this);"
              name="selling_plan_option"
              value=""
              data-selling-plan
@@ -32,6 +34,32 @@
 {% endif %}
 
 <script>
+
+function checkSelling(radio){
+var check_radio = radio.getAttribute("value");
+       document.querySelectorAll("[action='/cart/add']").forEach(function(form){
+    var check_exist = form.querySelector(".custom_selling");
+           var input = document.createElement('input');
+input.type = 'hidden';
+input.name = 'selling_plan';
+           input.className="custom_selling";
+input.value = check_radio;
+
+form.appendChild(input);
+                    if(check_exist == undefined){
+                    form.append(input);  
+                    }
+                else{
+                    check_exist.value = check_radio;
+                        }
+    });
+     
+}
+
+
+
+
+
 (function () {
 
   function getForm() {
